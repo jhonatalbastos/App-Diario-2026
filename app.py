@@ -5,19 +5,19 @@ from datetime import datetime, date, timedelta
 from github import Github, Auth
 from groq import Groq
 
-# Configuração da página - Versão 2.3
-st.set_page_config(page_title="Love Planner 2026 V2.3", layout="wide", page_icon="❤️")
+# Configuração da página - Versão 3.5
+st.set_page_config(page_title="Love Planner 3.5", layout="wide", page_icon="❤️")
 
 # --- CONFIGURAÇÃO DE SEGURANÇA (SECRETS) ---
 try:
     GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
     GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
     GITHUB_REPO = st.secrets["GITHUB_REPO"]
-except Exception as e:
-    st.error("Erro ao carregar Secrets. Verifique as configurações no Streamlit Cloud.")
+except:
+    st.error("Erro nos Secrets. Verifique as chaves no Streamlit Cloud.")
     st.stop()
 
-# Inicialização das APIs
+# Inicialização de APIs
 client_groq = Groq(api_key=GROQ_API_KEY)
 auth = Auth.Token(GITHUB_TOKEN)
 g = Github(auth=auth)
@@ -27,180 +27,174 @@ repo = g.get_repo(GITHUB_REPO)
 def load_data():
     try:
         contents = repo.get_contents("data_2026.json")
-        return json.loads(contents.decoded_content.decode())
-    except Exception:
-        # Estrutura inicial com lista de opções padrão
+        data = json.loads(contents.decoded_content.decode())
+        # Garantir estrutura
+        if "registros" not in data: data["registros"] = {}
+        if "eventos" not in data: data["eventos"] = {}
+        if "acordos_mestres" not in data: data["acordos_mestres"] = []
+        if "configuracoes" not in data: data["configuracoes"] = {
+            "opcoes_eu_fiz": ["Flores", "Elogios", "Ajuda", "Ouvir", "Cozinhar"],
+            "opcoes_ela_fez": ["Carinho", "Apoio", "Cuidado", "Beijos"]
+        }
+        return data
+    except:
         return {
-            "registros": {}, 
-            "eventos": {}, 
+            "registros": {}, "eventos": {}, "acordos_mestres": [],
             "configuracoes": {
-                "opcoes_eu_fiz": ["Flores", "Elogios", "Ajuda", "Ouvir", "Cozinhar", "Massagem"],
-                "opcoes_ela_fez": ["Carinho", "Apoio", "Cuidado", "Beijos", "Elogio"]
+                "opcoes_eu_fiz": ["Flores", "Elogios", "Ajuda", "Ouvir", "Cozinhar"],
+                "opcoes_ela_fez": ["Carinho", "Apoio", "Cuidado", "Beijos"]
             }
         }
 
 def save_all(data):
-    file_path = "data_2026.json"
     json_data = json.dumps(data, indent=4, ensure_ascii=False)
+    file_path = "data_2026.json"
     try:
         contents = repo.get_contents(file_path)
-        repo.update_file(contents.path, f"Atualização {datetime.now()}", json_data, contents.sha)
-    except Exception:
-        repo.create_file(file_path, "Criação do Banco de Dados", json_data)
+        repo.update_file(contents.path, f"Sincronização {datetime.now()}", json_data, contents.sha)
+    except:
+        repo.create_file(file_path, "Início do Banco de Dados", json_data)
 
-# Carregamento do Banco de Dados
 db = load_data()
 
-# Garantir integridade das configurações
-if "configuracoes" not in db:
-    db["configuracoes"] = {
-        "opcoes_eu_fiz": ["Flores", "Elogios", "Ajuda", "Ouvir", "Cozinhar", "Massagem"],
-        "opcoes_ela_fez": ["Carinho", "Apoio", "Cuidado", "Beijos", "Elogio"]
-    }
-
-# --- INTERFACE LATERAL ---
+# --- NAVEGAÇÃO ---
 st.sidebar.title("❤️ Love Planner 2026")
-menu = st.sidebar.radio("Navegação:", ["📝 Diário", "📅 Planejar Eventos", "📊 Painel 2026 (Grids)", "💡 Insights da IA", "⚙️ Configurações"])
+menu = st.sidebar.radio("Navegação:", ["📝 Diário", "🤝 Central de Acordos", "📊 Painel & Grids", "⏳ Cápsula do Tempo", "📅 Eventos", "⚙️ Configurações"])
 
-# --- 1. ABA DE REGISTRO (DIÁRIO) ---
+# --- 1. ABA DIÁRIO (REGISTRO + WHATSAPP) ---
 if menu == "📝 Diário":
-    st.header("O que aconteceu entre você e Katheryn?")
-    selected_date = st.date_input("Data do Registro:", date.today())
+    st.header("📝 Registro do Dia")
+    selected_date = st.date_input("Selecione a data:", date.today())
     date_str = selected_date.strftime("%Y-%m-%d")
-    
     day_data = db["registros"].get(date_str, {})
     is_locked = day_data.get("locked", False)
 
     if is_locked:
-        st.warning(f"🔒 Registro de {selected_date.strftime('%d/%m/%Y')} trancado.")
+        st.warning(f"🔒 Este registro está trancado.")
         if st.button("🔓 Destrancar"):
             db["registros"][date_str]["locked"] = False
-            save_all(db)
-            st.rerun()
-    
-    with st.form("registro_dia"):
-        nota_dia = st.select_slider("Nota do Relacionamento:", options=list(range(1, 11)), value=day_data.get("nota", 7), disabled=is_locked)
+            save_all(db); st.rerun()
+
+    with st.form("form_diario"):
+        nota = st.select_slider("Nota do Dia (Semáforo):", options=range(1, 11), value=day_data.get("nota", 7), disabled=is_locked)
         
+        # Monitoramento de Acordos Ativos
+        acordos_check = [a for a in db["acordos_mestres"] if a.get("monitorar_diariamente")]
+        checks_preenchidos = {}
+        if acordos_check:
+            st.subheader("🎯 Acompanhamento de Acordos")
+            cols = st.columns(len(acordos_check))
+            for i, ac in enumerate(acordos_check):
+                label = ac['nome_curto']
+                checks_preenchidos[label] = cols[i].checkbox(label, value=day_data.get("acordos_vivos", {}).get(label, False), disabled=is_locked)
+
         st.divider()
-        c1, c2, c3 = st.columns(3)
-        q1 = c1.toggle("Conversamos?", day_data.get("q1", False), disabled=is_locked)
-        q2 = c2.toggle("Rimos juntos?", day_data.get("q2", False), disabled=is_locked)
-        q3 = c3.toggle("Fiz um elogio?", day_data.get("q3", False), disabled=is_locked)
-        
-        col_a, col_b = st.columns(2)
-        with col_a:
-            # Opção "Outro" adicionada à lista
-            lista_eu = db["configuracoes"]["opcoes_eu_fiz"] + ["Outro"]
-            eu_fiz = st.multiselect("Eu fiz:", lista_eu, [x for x in day_data.get("eu_fiz", []) if x in db["configuracoes"]["opcoes_eu_fiz"]], disabled=is_locked)
-            
-            nova_opcao = ""
-            if "Outro" in eu_fiz:
-                nova_opcao = st.text_input("Qual nova opção deseja adicionar?", placeholder="Ex: Fiz uma surpresa")
-
+        col1, col2 = st.columns(2)
+        with col1:
+            opcoes_eu = db["configuracoes"]["opcoes_eu_fiz"] + ["Outro"]
+            eu_fiz = st.multiselect("Eu fiz para ela:", opcoes_eu, [x for x in day_data.get("eu_fiz", []) if x in opcoes_eu], disabled=is_locked)
+            nova_opcao = st.text_input("Se marcou 'Outro', digite aqui:", disabled=is_locked) if "Outro" in eu_fiz else ""
             disc = st.checkbox("Houve discussão?", day_data.get("discussao", False), disabled=is_locked)
-            mot_disc = st.text_input("Motivo:", day_data.get("motivo_disc", ""), disabled=is_locked or not disc)
+        with col2:
+            recebi = st.multiselect("Ela fez para mim:", db["configuracoes"]["opcoes_ela_fez"], day_data.get("recebi", []), disabled=is_locked)
+            sexo = st.radio("Houve sexo?", ["Sim", "Não"], index=0 if day_data.get("sexo", True) else 1, disabled=is_locked)
+
+        st.subheader("💬 Contexto (WhatsApp)")
+        ws_input = st.text_area("Cole trechos de conversas do WhatsApp (opcional):", value=day_data.get("whatsapp_txt", ""), height=100, disabled=is_locked)
         
-        with col_b:
-            recebi = st.multiselect("Ela fez:", db["configuracoes"]["opcoes_ela_fez"], day_data.get("recebi", []), disabled=is_locked)
-            sexo = st.radio("Sexo?", ["Sim", "Não"], index=0 if day_data.get("sexo", True) else 1, disabled=is_locked)
-            mot_n_sexo = st.text_input("Por que não?", day_data.get("motivo_nao_sexo", ""), disabled=is_locked or sexo=="Sim")
+        resumo = st.text_area("Resumo do dia:", value=day_data.get("resumo", ""), disabled=is_locked)
 
-        resumo = st.text_area("Resumo livre:", day_data.get("resumo", ""), disabled=is_locked)
+        if not is_locked and st.form_submit_button("💾 Salvar e Trancar"):
+            # Lógica 'Outro'
+            final_eu_fiz = [i for i in eu_fiz if i != "Outro"]
+            if nova_opcao and nova_opcao not in db["configuracoes"]["opcoes_eu_fiz"]:
+                db["configuracoes"]["opcoes_eu_fiz"].append(nova_opcao)
+                final_eu_fiz.append(nova_opcao)
 
-        if not is_locked:
-            if st.form_submit_button("💾 Salvar e Trancar"):
-                # Lógica para salvar nova opção do "Outro"
-                final_eu_fiz = [item for item in eu_fiz if item != "Outro"]
-                if nova_opcao:
-                    if nova_opcao not in db["configuracoes"]["opcoes_eu_fiz"]:
-                        db["configuracoes"]["opcoes_eu_fiz"].append(nova_opcao)
-                    if nova_opcao not in final_eu_fiz:
-                        final_eu_fiz.append(nova_opcao)
+            db["registros"][date_str] = {
+                "nota": nota, "eu_fiz": final_eu_fiz, "recebi": recebi,
+                "discussao": disc, "sexo": sexo == "Sim", "resumo": resumo,
+                "whatsapp_txt": ws_input, "acordos_vivos": checks_preenchidos, "locked": True
+            }
+            save_all(db); st.success("Salvo!"); st.rerun()
 
-                db["registros"][date_str] = {
-                    "nota": nota_dia, "q1": q1, "q2": q2, "q3": q3,
-                    "eu_fiz": final_eu_fiz, "recebi": recebi,
-                    "discussao": disc, "motivo_disc": mot_disc,
-                    "sexo": sexo == "Sim", "motivo_nao_sexo": mot_n_sexo,
-                    "resumo": resumo, "locked": True
-                }
-                save_all(db)
-                st.success("Salvo com sucesso!")
-                st.rerun()
+# --- 2. CENTRAL DE ACORDOS ---
+elif menu == "🤝 Central de Acordos":
+    st.header("🤝 Nossos Acordos e Combinados")
+    with st.form("novo_acordo"):
+        tit = st.text_input("Descrição do Acordo:")
+        curto = st.text_input("Nome curto (para o Checklist diário):")
+        monitorar = st.checkbox("Deseja monitorar este acordo diariamente no Diário?")
+        if st.form_submit_button("Firmar Acordo"):
+            db["acordos_mestres"].append({"titulo": tit, "nome_curto": curto, "monitorar_diariamente": monitorar, "data": str(date.today())})
+            save_all(db); st.success("Acordo registrado!"); st.rerun()
 
-# --- 2. ABA DE CONFIGURAÇÕES (GERENCIAMENTO) ---
-elif menu == "⚙️ Configurações":
-    st.header("⚙️ Gerenciar Opções de Checklist")
-    st.write("Desmarque as opções que deseja remover e clique no botão de descartar.")
-    
-    c1, c2 = st.columns(2)
-    
-    with c1:
-        st.subheader("Minhas Ações (Eu Fiz)")
-        opcoes_eu = db["configuracoes"]["opcoes_eu_fiz"]
-        mantidos_eu = []
-        for opt in opcoes_eu:
-            if st.checkbox(opt, value=True, key=f"check_eu_{opt}"):
-                mantidos_eu.append(opt)
-        
-        if st.button("Descartar Selecionados (Eu Fiz)"):
-            db["configuracoes"]["opcoes_eu_fiz"] = mantidos_eu
-            save_all(db)
-            st.rerun()
+    st.subheader("Acordos Firmados")
+    for i, ac in enumerate(db["acordos_mestres"]):
+        st.write(f"- **{ac['nome_curto']}**: {ac['titulo']} (Início: {ac['data']})")
+        if st.button("Excluir", key=f"del_ac_{i}"):
+            db["acordos_mestres"].pop(i)
+            save_all(db); st.rerun()
 
-    with c2:
-        st.subheader("Ações dela (Ela Fez)")
-        opcoes_ela = db["configuracoes"]["opcoes_ela_fez"]
-        mantidos_ela = []
-        for opt in opcoes_ela:
-            if st.checkbox(opt, value=True, key=f"check_ela_{opt}"):
-                mantidos_ela.append(opt)
-        
-        if st.button("Descartar Selecionados (Ela Fez)"):
-            db["configuracoes"]["opcoes_ela_fez"] = mantidos_ela
-            save_all(db)
-            st.rerun()
+# --- 3. PAINEL & GRIDS ---
+elif menu == "📊 Painel & Grids":
+    st.header("📊 Retrospectiva 2026")
+    def draw_grid(title, key, c_on, c_off="#ebedf0"):
+        st.write(f"### {title}")
+        days = pd.date_range("2026-01-01", "2026-12-31")
+        grid_html = '<div style="display: flex; flex-wrap: wrap; gap: 3px; max-width: 900px;">'
+        for d in days:
+            ds = d.strftime("%Y-%m-%d")
+            reg = db["registros"].get(ds, {})
+            color = c_off
+            if ds in db["registros"]:
+                if key == "nota":
+                    n = reg.get("nota", 0)
+                    color = "#216e39" if n >= 8 else "#f9d71c" if n >= 5 else "#f44336"
+                elif key == "sexo": color = "#e91e63" if reg.get("sexo") else c_off
+                elif key == "disc": color = "#f44336" if reg.get("discussao") else c_off
+                elif key == "rir": color = "#2196f3" if reg.get("q2") else c_off
+            grid_html += f'<div title="{ds}" style="width: 12px; height: 12px; background-color: {color}; border-radius: 2px;"></div>'
+        st.markdown(grid_html + '</div>', unsafe_allow_html=True)
 
-# --- MANTENDO DEMAIS FUNCIONALIDADES (GRIDS, PLANEJADOR, IA) ---
-elif menu == "📊 Painel 2026 (Grids)":
-    # (Código da aba de Grids da versão anterior...)
-    st.header("📊 Retrospectiva Visual 2026")
-    def draw_grid(title, metric_type):
-        st.subheader(title)
-        all_days = pd.date_range(start="2026-01-01", end="2026-12-31")
-        html_grid = '<div style="display: flex; flex-wrap: wrap; gap: 3px; max-width: 900px; margin-bottom: 20px;">'
-        for d in all_days:
-            d_str = d.strftime("%Y-%m-%d")
-            reg = db["registros"].get(d_str, {})
-            color = "#ebedf0"
+    draw_grid("⭐ Nota do Dia (Semáforo)", "nota", "")
+    draw_grid("🔥 Frequência Sexual", "sexo", "")
+    draw_grid("⚠️ Discussões", "disc", "")
+
+# --- 4. CÁPSULA DO TEMPO ---
+elif menu == "⏳ Cápsula do Tempo":
+    st.header("⏳ Memórias de Outros Tempos")
+    col_a, col_b = st.columns(2)
+    for i, label in enumerate(["Há 30 dias", "Há 90 dias"]):
+        d_alvo = date.today() - timedelta(days=30 if i==0 else 90)
+        d_str = d_alvo.strftime("%Y-%m-%d")
+        with col_a if i==0 else col_b:
+            st.subheader(label)
             if d_str in db["registros"]:
-                if metric_type == "nota":
-                    val = reg.get("nota", 0)
-                    color = "#216e39" if val >= 8 else "#f9d71c" if val >= 5 else "#f44336"
-                elif metric_type == "rir": color = "#2196f3" if reg.get("q2") else "#ebedf0"
-                elif metric_type == "discussao": color = "#f44336" if reg.get("discussao") else "#ebedf0"
-                elif metric_type == "sexo": color = "#e91e63" if reg.get("sexo") else "#ebedf0"
-            html_grid += f'<div title="{d_str}" style="width: 13px; height: 13px; background-color: {color}; border-radius: 2px;"></div>'
-        html_grid += '</div>'
-        st.markdown(html_grid, unsafe_allow_html=True)
-    draw_grid("⭐ Nota do Relacionamento", "nota")
-    draw_grid("😂 Rimos Juntos?", "rir")
-    draw_grid("🔥 Frequência Sexual", "sexo")
-    draw_grid("⚠️ Discussões", "discussao")
+                st.info(f"Em {d_alvo.strftime('%d/%m/%Y')}: {db['registros'][d_str].get('resumo')}")
+            else: st.write("Sem registros nesta data.")
 
-elif menu == "📅 Planejar Eventos":
-    st.header("Eventos Futuros")
+# --- 5. DEMAIS FUNÇÕES ---
+elif menu == "📅 Eventos":
+    st.header("📅 Eventos e Planejamento")
     with st.form("ev"):
-        ev_data = st.date_input("Data:", date.today())
-        ev_nome = st.text_input("Evento:")
+        dt = st.date_input("Data do Evento:")
+        tit = st.text_input("O que vamos fazer?")
         if st.form_submit_button("Agendar"):
-            db["eventos"][ev_data.strftime("%Y-%m-%d")] = {"titulo": ev_nome}
-            save_all(db)
-            st.success("Agendado!")
+            db["eventos"][dt.strftime("%Y-%m-%d")] = tit
+            save_all(db); st.success("Agendado!")
 
 elif menu == "💡 Insights da IA":
-    st.header("Análise IA")
-    if st.button("Gerar"):
+    st.header("💡 Insights do Especialista")
+    if st.button("Analisar Semana"):
         ctx = str(list(db["registros"].items())[-7:])
-        completion = client_groq.chat.completions.create(model="llama3-70b-8192", messages=[{"role":"user","content":f"Dê uma dica para Jhonata com base em: {ctx}"}])
-        st.info(completion.choices[0].message.content)
+        prompt = f"Analise estes dados e as conversas de WhatsApp (se houver) para dar dicas de saúde emocional para o casal Jhonata e Katheryn: {ctx}"
+        res = client_groq.chat.completions.create(model="llama3-70b-8192", messages=[{"role":"user", "content":prompt}])
+        st.write(res.choices[0].message.content)
+
+elif menu == "⚙️ Configurações":
+    st.header("⚙️ Gerenciar Sistema")
+    # Lógica de descarte de opções multiselect (conforme v2.3)
+    if st.button("Limpar Opções 'Eu Fiz'"):
+        db["configuracoes"]["opcoes_eu_fiz"] = ["Flores", "Elogios", "Ajuda"]
+        save_all(db); st.success("Resetado!")
