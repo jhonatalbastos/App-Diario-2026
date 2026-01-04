@@ -1,15 +1,14 @@
 import streamlit as st
 import pandas as pd
 import json
-import random
-from datetime import datetime
+from datetime import datetime, date
 from github import Github
 from groq import Groq
 
 # Configuração da página
 st.set_page_config(page_title="Diário Katheryn & Jhonata 2026", layout="wide")
 
-# Inicialização de APIs via Secrets
+# --- CONFIGURAÇÃO DE SEGURANÇA (SECRETS) ---
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 GITHUB_REPO = st.secrets["GITHUB_REPO"]
@@ -18,6 +17,7 @@ client_groq = Groq(api_key=GROQ_API_KEY)
 g = Github(GITHUB_TOKEN)
 repo = g.get_repo(GITHUB_REPO)
 
+# --- FUNÇÕES DE DADOS ---
 def load_data():
     try:
         contents = repo.get_contents("data_2026.json")
@@ -25,110 +25,118 @@ def load_data():
     except:
         return {}
 
-def save_data(new_data):
+def save_data(date_key, new_data):
     file_path = "data_2026.json"
     all_data = load_data()
-    date_str = datetime.now().strftime("%Y-%m-%d")
-    all_data[date_str] = new_data
+    all_data[date_key] = new_data
     json_data = json.dumps(all_data, indent=4, ensure_ascii=False)
     try:
         contents = repo.get_contents(file_path)
-        repo.update_file(contents.path, f"Registro {date_str}", json_data, contents.sha)
+        repo.update_file(contents.path, f"Registro {date_key}", json_data, contents.sha)
     except:
-        repo.create_file(file_path, f"Initial commit", json_data)
+        repo.create_file(file_path, "Initial commit", json_data)
 
 data_history = load_data()
 
-# --- SIDEBAR / NAVEGAÇÃO ---
-st.sidebar.title("❤️ Menu Principal")
-menu = st.sidebar.radio("Ir para:", ["Registrar Dia", "Insights e Dicas", "Histórico e Gráficos"])
+# --- NAVEGAÇÃO ---
+menu = st.sidebar.radio("Navegação", ["📝 Registrar/Editar", "📊 Painel 2026 (Grid)", "💡 Insights IA"])
 
-if menu == "Registrar Dia":
-    st.header(f"📝 Registro Diário - {datetime.now().strftime('%d/%m/%Y')}")
+# --- ABA 1: REGISTRO COM TRAVA ---
+if menu == "📝 Registrar/Editar":
+    selected_date = st.date_input("Selecione o dia:", date.today())
+    date_str = selected_date.strftime("%Y-%m-%d")
     
-    with st.form("diario_form"):
-        st.subheader("⚡ Quick Check (Sim/Não)")
-        c1, c2, c3 = st.columns(3)
-        q1 = c1.radio("Conversamos sem telas?", ["Sim", "Não"])
-        q2 = c2.radio("Rimos juntos hoje?", ["Sim", "Não"])
-        q3 = c3.radio("Fiz um elogio hoje?", ["Sim", "Não"])
-        q4 = c1.radio("Demonstramos afeto?", ["Sim", "Não"])
-        q5 = c2.radio("Estresse externo alto?", ["Sim", "Não"])
-        q6 = c3.radio("Saímos da rotina?", ["Sim", "Não"])
+    # Carregar dados do dia se existirem
+    day_data = data_history.get(date_str, {})
+    is_locked = day_data.get("locked", False)
 
-        st.divider()
-        
+    st.header(f"Registro de {selected_date.strftime('%d/%b/%Y')}")
+
+    if is_locked:
+        st.warning("🔒 Este dia está TRANCADO. Para editar, clique em 'Destrancar' abaixo.")
+        if st.button("🔓 Destrancar Dia"):
+            day_data["locked"] = False
+            save_data(date_str, day_data)
+            st.rerun()
+    
+    # Interface de formulário (desabilitada se estiver trancada)
+    with st.container():
+        st.subheader("Checklist Rápido")
+        q_cols = st.columns(3)
+        q1 = q_cols[0].toggle("Conversamos?", day_data.get("q1", False), disabled=is_locked)
+        q2 = q_cols[1].toggle("Rimos juntos?", day_data.get("q2", False), disabled=is_locked)
+        q3 = q_cols[2].toggle("Elogio feito?", day_data.get("q3", False), disabled=is_locked)
+
         col_a, col_b = st.columns(2)
         with col_a:
-            eu_fiz = st.multiselect("O que eu fiz por ela:", ["Flores", "Elogios", "Ajuda em casa", "Presente", "Ouvir", "Cozinhar", "Massagem"])
-            recebi = st.multiselect("O que ela fez por mim:", ["Carinho", "Apoio emocional", "Presente", "Cuidado", "Elogio", "Beijos"])
-        
+            eu_fiz = st.multiselect("Eu fiz:", ["Flores", "Elogios", "Ajuda", "Ouvir", "Cozinhar"], day_data.get("eu_fiz", []), disabled=is_locked)
+            teve_disc = st.checkbox("Houve discussão?", day_data.get("discussao", False), disabled=is_locked)
+            motivo_disc = st.text_input("Motivo discussão:", day_data.get("motivo_disc", ""), disabled=is_locked or not teve_disc)
+
         with col_b:
-            fizemos = st.multiselect("O que fizemos juntos:", ["Jantar fora", "Filme/Série", "Passeio", "Conversa profunda", "Treino/Esporte"])
-            
-            # Discussão Dinâmica
-            teve_disc = st.checkbox("Houve discussão?")
-            motivo_disc = ""
-            if teve_disc:
-                motivos_existentes = list(set([v.get("motivo_disc", "") for v in data_history.values() if v.get("motivo_disc")]))
-                motivo_disc = st.selectbox("Motivo:", ["Selecione ou digite abaixo"] + motivos_existentes)
-                novo_motivo = st.text_input("Novo motivo (se não estiver na lista):")
-                motivo_disc = novo_motivo if novo_motivo else motivo_disc
+            recebi = st.multiselect("Katheryn fez:", ["Carinho", "Apoio", "Cuidado", "Beijos"], day_data.get("recebi", []), disabled=is_locked)
+            teve_sexo = st.radio("Sexo?", ["Sim", "Não"], index=0 if day_data.get("sexo", True) else 1, disabled=is_locked)
+            motivo_n_sexo = st.text_input("Motivo ausência:", day_data.get("motivo_nao_sexo", ""), disabled=is_locked or teve_sexo=="Sim")
 
-            # Sexo Dinâmico
-            teve_sexo = st.radio("Houve sexo?", ["Sim", "Não"])
-            motivo_nao_sexo = ""
-            if teve_sexo == "Não":
-                m_sexo_ex = list(set([v.get("motivo_nao_sexo", "") for v in data_history.values() if v.get("motivo_nao_sexo")]))
-                motivo_nao_sexo = st.selectbox("Por que não houve?", ["Selecione"] + m_sexo_ex + ["Cansaço", "Falta de Tempo", "Saúde", "Indisposição"])
-                n_m_sexo = st.text_input("Outro motivo para ausência de sexo:")
-                motivo_nao_sexo = n_m_sexo if n_m_sexo else motivo_nao_sexo
+        resumo = st.text_area("Resumo do dia:", day_data.get("resumo", ""), disabled=is_locked)
+        acordos = st.text_area("Acordos/Melhorias:", day_data.get("acordos", ""), disabled=is_locked)
 
-        st.divider()
-        acordos = st.text_area("Novos combinados / O que devo passar a fazer:")
-        resumo = st.text_area("Resumo livre do dia:")
+        if not is_locked:
+            if st.button("💾 Salvar e TRANCAR"):
+                new_payload = {
+                    "q1": q1, "q2": q2, "q3": q3,
+                    "eu_fiz": eu_fiz, "recebi": recebi,
+                    "discussao": teve_disc, "motivo_disc": motivo_disc,
+                    "sexo": teve_sexo == "Sim", "motivo_nao_sexo": motivo_n_sexo,
+                    "resumo": resumo, "acordos": acordos,
+                    "locked": True
+                }
+                save_data(date_str, new_payload)
+                st.success("Dia salvo e trancado!")
+                st.rerun()
 
-        submitted = st.form_submit_button("Salvar Dia")
-        if submitted:
-            payload = {
-                "quick_check": [q1, q2, q3, q4, q5, q6],
-                "eu_fiz": eu_fiz, "recebi": recebi, "fizemos": fizemos,
-                "discussao": teve_disc, "motivo_disc": motivo_disc,
-                "sexo": teve_sexo == "Sim", "motivo_nao_sexo": motivo_nao_sexo,
-                "acordos": acordos, "resumo": resumo
-            }
-            save_data(payload)
-            st.success("Dados enviados ao GitHub!")
-
-elif menu == "Insights e Dicas":
-    st.header("💡 Insights da IA para amanhã")
+# --- ABA 2: GRID ESTILO GITHUB ---
+elif menu == "📊 Painel 2026 (Grid)":
+    st.header("📅 Retrospectiva 2026")
     
-    if not data_history:
-        st.info("Aguardando dados para gerar insights.")
-    else:
-        if st.button("🔄 Gerar nova sugestão/insight"):
-            contexto = str(list(data_history.items())[-7:]) # Última semana
-            prompt = f"Com base nestes dados de relacionamento: {contexto}. Sugira UMA ação prática, criativa e específica para o Jhonata fazer amanhã para surpreender a Katheryn ou melhorar a relação. Seja breve e direto."
+    def generate_grid(data, metric_key, color_on, label):
+        st.write(f"### {label}")
+        # Criar datas para o ano de 2026
+        all_days = pd.date_range(start="2026-01-01", end="2026-12-31")
+        
+        # Criar HTML para o Grid
+        html_grid = '<div style="display: flex; flex-wrap: wrap; gap: 3px; max-width: 700px;">'
+        for d in all_days:
+            d_str = d.strftime("%Y-%m-%d")
+            day_info = data.get(d_str, {})
             
-            completion = client_groq.chat.completions.create(
-                model="llama3-70b-8192",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.9 # Mais alto para variar as sugestões no reload
-            )
-            st.info(completion.choices[0].message.content)
+            # Lógica de cor
+            color = "#ebedf0" # Cinza vazio
+            if d_str in data:
+                if metric_key == "preenchido":
+                    color = "#216e39" if day_info.get("resumo") else "#9be9a8"
+                elif metric_key == "sexo":
+                    color = "#e91e63" if day_info.get("sexo") else "#ebedf0"
+                elif metric_key == "discussao":
+                    color = "#f44336" if day_info.get("discussao") else "#ebedf0"
+            
+            tooltip = f"{d_str}: {day_info.get('resumo', 'Sem registro')[:30]}..."
+            html_grid += f'<div title="{tooltip}" style="width: 12px; height: 12px; background-color: {color}; border-radius: 2px;"></div>'
+        html_grid += '</div>'
+        st.markdown(html_grid, unsafe_allow_html=True)
 
-elif menu == "Histórico e Gráficos":
-    st.header("📊 Análise de Padrões")
-    if data_history:
-        df = pd.DataFrame.from_dict(data_history, orient='index')
-        
-        st.subheader("Gráfico de Recorrência")
-        # Criando uma visualização simples de colunas
-        chart_data = df[['discussao', 'sexo']].astype(int)
-        st.bar_chart(chart_data)
-        
-        st.subheader("Motivos Recorrentes de Discussão")
-        st.write(df[df['discussao'] == True]['motivo_disc'].value_counts())
-        
-        st.subheader("Log Completo")
-        st.write(df)
+    generate_grid(data_history, "preenchido", "green", "Dinamismo de Preenchimento (Verde Escuro = Com Comentário)")
+    generate_grid(data_history, "sexo", "pink", "Frequência Sexual (Rosa = Sim)")
+    generate_grid(data_history, "discussao", "red", "Conflitos (Vermelho = Discussão)")
+
+# --- ABA 3: INSIGHTS ---
+elif menu == "💡 Insights IA":
+    st.header("Especialista Groq")
+    if st.button("Gerar Insight Aleatório"):
+        if data_history:
+            recent = str(list(data_history.items())[-5:])
+            prompt = f"Dados: {recent}. Dê um conselho curto e sábio para o relacionamento de Jhonata e Katheryn."
+            resp = client_groq.chat.completions.create(model="llama3-70b-8192", messages=[{"role":"user","content":prompt}])
+            st.info(resp.choices[0].message.content)
+        else:
+            st.warning("Sem dados suficientes.")
