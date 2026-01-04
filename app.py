@@ -1,19 +1,20 @@
 import streamlit as st
 import pandas as pd
 import json
+import re
 from datetime import datetime, date, timedelta
 from github import Github, Auth
 from groq import Groq
 
-# Configuração da página - Versão 3.5
-st.set_page_config(page_title="Love Planner 3.5", layout="wide", page_icon="❤️")
+# --- CONFIGURAÇÃO DA PÁGINA ---
+st.set_page_config(page_title="Love Planner 4.0", layout="wide", page_icon="❤️")
 
-# --- CONFIGURAÇÃO DE SEGURANÇA (SECRETS) ---
+# --- SEGURANÇA (SECRETS) ---
 try:
     GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
     GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
     GITHUB_REPO = st.secrets["GITHUB_REPO"]
-except:
+except Exception as e:
     st.error("Erro nos Secrets. Verifique as chaves no Streamlit Cloud.")
     st.stop()
 
@@ -23,26 +24,30 @@ auth = Auth.Token(GITHUB_TOKEN)
 g = Github(auth=auth)
 repo = g.get_repo(GITHUB_REPO)
 
-# --- FUNÇÕES DE PERSISTÊNCIA ---
+# --- CONSTANTES ---
+LINGUAGENS_LISTA = ["Atos de Serviço", "Palavras de Afirmação", "Tempo de Qualidade", "Toque Físico", "Presentes"]
+
+# --- FUNÇÕES DE DADOS ---
 def load_data():
     try:
         contents = repo.get_contents("data_2026.json")
         data = json.loads(contents.decoded_content.decode())
-        # Garantir estrutura
+        # Garantir chaves básicas
         if "registros" not in data: data["registros"] = {}
         if "eventos" not in data: data["eventos"] = {}
         if "acordos_mestres" not in data: data["acordos_mestres"] = []
-        if "configuracoes" not in data: data["configuracoes"] = {
-            "opcoes_eu_fiz": ["Flores", "Elogios", "Ajuda", "Ouvir", "Cozinhar"],
-            "opcoes_ela_fez": ["Carinho", "Apoio", "Cuidado", "Beijos"]
-        }
+        if "configuracoes" not in data:
+            data["configuracoes"] = {
+                "opcoes_eu_fiz": ["Flores", "Elogios", "Ajuda", "Ouvir"],
+                "opcoes_ela_fez": ["Carinho", "Apoio", "Cuidado", "Beijos"]
+            }
         return data
     except:
         return {
             "registros": {}, "eventos": {}, "acordos_mestres": [],
             "configuracoes": {
-                "opcoes_eu_fiz": ["Flores", "Elogios", "Ajuda", "Ouvir", "Cozinhar"],
-                "opcoes_ela_fez": ["Carinho", "Apoio", "Cuidado", "Beijos"]
+                "opcoes_eu_fiz": ["Flores", "Elogios"],
+                "opcoes_ela_fez": ["Carinho", "Beijos"]
             }
         }
 
@@ -57,144 +62,185 @@ def save_all(data):
 
 db = load_data()
 
-# --- NAVEGAÇÃO ---
-st.sidebar.title("❤️ Love Planner 2026")
-menu = st.sidebar.radio("Navegação:", ["📝 Diário", "🤝 Central de Acordos", "📊 Painel & Grids", "⏳ Cápsula do Tempo", "📅 Eventos", "⚙️ Configurações"])
+# --- NAVEGAÇÃO LATERAL ---
+st.sidebar.title("❤️ Love Planner 4.0")
+menu = st.sidebar.radio("Navegação:", ["📝 Diário", "🤝 Central de Acordos", "📊 Painel & Grids", "⏳ Cápsula do Tempo", "📅 Eventos", "⚙️ Configurações", "💡 Insights da IA"])
 
-# --- 1. ABA DIÁRIO (REGISTRO + WHATSAPP) ---
+# --- 1. ABA DIÁRIO ---
 if menu == "📝 Diário":
-    st.header("📝 Registro do Dia")
-    selected_date = st.date_input("Selecione a data:", date.today())
+    st.header("📝 Registro Diário")
+    selected_date = st.date_input("Data do Registro:", date.today())
     date_str = selected_date.strftime("%Y-%m-%d")
     day_data = db["registros"].get(date_str, {})
     is_locked = day_data.get("locked", False)
 
     if is_locked:
-        st.warning(f"🔒 Este registro está trancado.")
+        st.warning("🔒 Este dia está trancado.")
         if st.button("🔓 Destrancar"):
             db["registros"][date_str]["locked"] = False
-            save_all(db); st.rerun()
+            save_all(db)
+            st.rerun()
 
     with st.form("form_diario"):
-        nota = st.select_slider("Nota do Dia (Semáforo):", options=range(1, 11), value=day_data.get("nota", 7), disabled=is_locked)
+        nota = st.select_slider("Como foi o dia? (1-Vermelho, 10-Verde):", options=range(1, 11), value=day_data.get("nota", 7), disabled=is_locked)
         
-        # Monitoramento de Acordos Ativos
-        acordos_check = [a for a in db["acordos_mestres"] if a.get("monitorar_diariamente")]
-        checks_preenchidos = {}
-        if acordos_check:
-            st.subheader("🎯 Acompanhamento de Acordos")
-            cols = st.columns(len(acordos_check))
-            for i, ac in enumerate(acordos_check):
+        # Checkbox de Acordos Firmados
+        acordos_ativos = [a for a in db["acordos_mestres"] if a.get("monitorar")]
+        checks_acordos_hoje = {}
+        if acordos_ativos:
+            st.subheader("🎯 Cumprimento de Acordos")
+            cols_ac = st.columns(len(acordos_ativos))
+            for i, ac in enumerate(acordos_ativos):
                 label = ac['nome_curto']
-                checks_preenchidos[label] = cols[i].checkbox(label, value=day_data.get("acordos_vivos", {}).get(label, False), disabled=is_locked)
+                checks_acordos_hoje[label] = cols_ac[i].checkbox(label, value=day_data.get("checks_acordos", {}).get(label, False), disabled=is_locked)
 
         st.divider()
         col1, col2 = st.columns(2)
+        
         with col1:
-            opcoes_eu = db["configuracoes"]["opcoes_eu_fiz"] + ["Outro"]
-            eu_fiz = st.multiselect("Eu fiz para ela:", opcoes_eu, [x for x in day_data.get("eu_fiz", []) if x in opcoes_eu], disabled=is_locked)
-            nova_opcao = st.text_input("Se marcou 'Outro', digite aqui:", disabled=is_locked) if "Outro" in eu_fiz else ""
+            st.subheader("Jhonata (Eu)")
+            op_eu = db["configuracoes"]["opcoes_eu_fiz"] + ["Outro"]
+            eu_fiz = st.multiselect("O que eu fiz por ela:", op_eu, [x for x in day_data.get("eu_fiz", []) if x in op_eu], disabled=is_locked)
+            novo_eu = st.text_input("Adicionar nova opção (Eu):") if "Outro" in eu_fiz else ""
+            
+            ling_eu = st.multiselect("Minhas Linguagens hoje:", LINGUAGENS_LISTA, day_data.get("ling_eu", []), disabled=is_locked)
             disc = st.checkbox("Houve discussão?", day_data.get("discussao", False), disabled=is_locked)
+
         with col2:
-            recebi = st.multiselect("Ela fez para mim:", db["configuracoes"]["opcoes_ela_fez"], day_data.get("recebi", []), disabled=is_locked)
+            st.subheader("Katheryn (Ela)")
+            op_ela = db["configuracoes"]["opcoes_ela_fez"] + ["Outro"]
+            ela_fez = st.multiselect("O que ela fez por mim:", op_ela, [x for x in day_data.get("ela_fez", []) if x in op_ela], disabled=is_locked)
+            novo_ela = st.text_input("Adicionar nova opção (Ela):") if "Outro" in ela_fez else ""
+            
+            ling_ela = st.multiselect("Linguagens dela hoje:", LINGUAGENS_LISTA, day_data.get("ling_ela", []), disabled=is_locked)
             sexo = st.radio("Houve sexo?", ["Sim", "Não"], index=0 if day_data.get("sexo", True) else 1, disabled=is_locked)
 
-        st.subheader("💬 Contexto (WhatsApp)")
-        ws_input = st.text_area("Cole trechos de conversas do WhatsApp (opcional):", value=day_data.get("whatsapp_txt", ""), height=100, disabled=is_locked)
+        st.divider()
+        with st.expander("💬 Importar Conversa do WhatsApp (Opcional)"):
+            ws_raw = st.text_area("Cole a conversa aqui (apenas mensagens do dia serão salvas):")
         
-        resumo = st.text_area("Resumo do dia:", value=day_data.get("resumo", ""), disabled=is_locked)
+        resumo = st.text_area("Resumo livre/Notas importantes:", day_data.get("resumo", ""), disabled=is_locked)
 
-        if not is_locked and st.form_submit_button("💾 Salvar e Trancar"):
-            # Lógica 'Outro'
-            final_eu_fiz = [i for i in eu_fiz if i != "Outro"]
-            if nova_opcao and nova_opcao not in db["configuracoes"]["opcoes_eu_fiz"]:
-                db["configuracoes"]["opcoes_eu_fiz"].append(nova_opcao)
-                final_eu_fiz.append(nova_opcao)
+        if not is_locked and st.form_submit_button("💾 Salvar e Trancar Registro"):
+            # Processar 'Outros'
+            f_eu = [i for i in eu_fiz if i != "Outro"]
+            if novo_eu and novo_eu not in db["configuracoes"]["opcoes_eu_fiz"]:
+                db["configuracoes"]["opcoes_eu_fiz"].append(novo_eu)
+                f_eu.append(novo_eu)
+            
+            f_ela = [i for i in ela_fez if i != "Outro"]
+            if novo_ela and novo_ela not in db["configuracoes"]["opcoes_ela_fez"]:
+                db["configuracoes"]["opcoes_ela_fez"].append(novo_ela)
+                f_ela.append(novo_ela)
+
+            # Filtrar WhatsApp por data (ex: 04/01/26)
+            ws_final = day_data.get("whatsapp_txt", "")
+            if ws_raw:
+                target = selected_date.strftime("%d/%m/%y")
+                ws_final = "\n".join([line for line in ws_raw.split('\n') if target in line])
 
             db["registros"][date_str] = {
-                "nota": nota, "eu_fiz": final_eu_fiz, "recebi": recebi,
+                "nota": nota, "eu_fiz": f_eu, "ela_fez": f_ela,
+                "ling_eu": ling_eu, "ling_ela": ling_ela,
                 "discussao": disc, "sexo": sexo == "Sim", "resumo": resumo,
-                "whatsapp_txt": ws_input, "acordos_vivos": checks_preenchidos, "locked": True
+                "whatsapp_txt": ws_final, "checks_acordos": checks_acordos_hoje, "locked": True
             }
-            save_all(db); st.success("Salvo!"); st.rerun()
+            save_all(db)
+            st.success("Salvo com sucesso!")
+            st.rerun()
 
 # --- 2. CENTRAL DE ACORDOS ---
 elif menu == "🤝 Central de Acordos":
-    st.header("🤝 Nossos Acordos e Combinados")
-    with st.form("novo_acordo"):
-        tit = st.text_input("Descrição do Acordo:")
-        curto = st.text_input("Nome curto (para o Checklist diário):")
-        monitorar = st.checkbox("Deseja monitorar este acordo diariamente no Diário?")
+    st.header("🤝 Gestão de Acordos")
+    with st.form("novo_ac"):
+        t = st.text_input("Descrição do Acordo:")
+        c = st.text_input("Nome Curto (Checklist):")
+        m = st.checkbox("Monitorar diariamente no Diário?")
         if st.form_submit_button("Firmar Acordo"):
-            db["acordos_mestres"].append({"titulo": tit, "nome_curto": curto, "monitorar_diariamente": monitorar, "data": str(date.today())})
-            save_all(db); st.success("Acordo registrado!"); st.rerun()
+            db["acordos_mestres"].append({"titulo": t, "nome_curto": c, "monitorar": m, "data": str(date.today())})
+            save_all(db)
+            st.rerun()
 
     st.subheader("Acordos Firmados")
     for i, ac in enumerate(db["acordos_mestres"]):
-        st.write(f"- **{ac['nome_curto']}**: {ac['titulo']} (Início: {ac['data']})")
-        if st.button("Excluir", key=f"del_ac_{i}"):
+        st.write(f"- **{ac['nome_curto']}**: {ac['titulo']} (Desde: {ac['data']})")
+        if st.button("Remover", key=f"del_{i}"):
             db["acordos_mestres"].pop(i)
-            save_all(db); st.rerun()
+            save_all(db)
+            st.rerun()
 
 # --- 3. PAINEL & GRIDS ---
 elif menu == "📊 Painel & Grids":
     st.header("📊 Retrospectiva 2026")
-    def draw_grid(title, key, c_on, c_off="#ebedf0"):
-        st.write(f"### {title}")
+    def draw_grid(title, metric, color):
+        st.write(f"#### {title}")
         days = pd.date_range("2026-01-01", "2026-12-31")
-        grid_html = '<div style="display: flex; flex-wrap: wrap; gap: 3px; max-width: 900px;">'
+        grid = '<div style="display: flex; flex-wrap: wrap; gap: 3px; max-width: 900px; margin-bottom: 20px;">'
         for d in days:
             ds = d.strftime("%Y-%m-%d")
             reg = db["registros"].get(ds, {})
-            color = c_off
+            c = "#ebedf0"
             if ds in db["registros"]:
-                if key == "nota":
+                if metric == "nota":
                     n = reg.get("nota", 0)
-                    color = "#216e39" if n >= 8 else "#f9d71c" if n >= 5 else "#f44336"
-                elif key == "sexo": color = "#e91e63" if reg.get("sexo") else c_off
-                elif key == "disc": color = "#f44336" if reg.get("discussao") else c_off
-                elif key == "rir": color = "#2196f3" if reg.get("q2") else c_off
-            grid_html += f'<div title="{ds}" style="width: 12px; height: 12px; background-color: {color}; border-radius: 2px;"></div>'
-        st.markdown(grid_html + '</div>', unsafe_allow_html=True)
+                    c = "#216e39" if n >= 8 else "#f9d71c" if n >= 5 else "#f44336"
+                elif metric in LINGUAGENS_LISTA:
+                    c = color if metric in reg.get("ling_eu", []) or metric in reg.get("ling_ela", []) else "#ebedf0"
+                else:
+                    c = color if reg.get(metric) else "#ebedf0"
+            grid += f'<div title="{ds}" style="width: 12px; height: 12px; background-color: {c}; border-radius: 2px;"></div>'
+        st.markdown(grid + '</div>', unsafe_allow_html=True)
 
-    draw_grid("⭐ Nota do Dia (Semáforo)", "nota", "")
-    draw_grid("🔥 Frequência Sexual", "sexo", "")
-    draw_grid("⚠️ Discussões", "disc", "")
+    draw_grid("⭐ Nota Geral (Semáforo)", "nota", "")
+    draw_grid("🔥 Intimidade (Sexo)", "sexo", "#e91e63")
+    draw_grid("⚠️ Discussões", "discussao", "#f44336")
+    st.divider()
+    st.subheader("🧬 Linguagens do Amor no Ano")
+    cols_ling = ["#ff5722", "#3f51b5", "#00bcd4", "#9c27b0", "#8bc34a"]
+    for i, l in enumerate(LINGUAGENS_LISTA):
+        draw_grid(f"Frequência: {l}", l, cols_ling[i])
 
 # --- 4. CÁPSULA DO TEMPO ---
 elif menu == "⏳ Cápsula do Tempo":
-    st.header("⏳ Memórias de Outros Tempos")
-    col_a, col_b = st.columns(2)
-    for i, label in enumerate(["Há 30 dias", "Há 90 dias"]):
-        d_alvo = date.today() - timedelta(days=30 if i==0 else 90)
-        d_str = d_alvo.strftime("%Y-%m-%d")
-        with col_a if i==0 else col_b:
-            st.subheader(label)
-            if d_str in db["registros"]:
-                st.info(f"Em {d_alvo.strftime('%d/%m/%Y')}: {db['registros'][d_str].get('resumo')}")
-            else: st.write("Sem registros nesta data.")
+    st.header("⏳ Memórias")
+    for d in [30, 90, 180]:
+        alvo = (date.today() - timedelta(days=d)).strftime("%Y-%m-%d")
+        if alvo in db["registros"]:
+            st.info(f"📅 Há {d} dias ({alvo}): {db['registros'][alvo].get('resumo')}")
 
-# --- 5. DEMAIS FUNÇÕES ---
+# --- 5. EVENTOS ---
 elif menu == "📅 Eventos":
-    st.header("📅 Eventos e Planejamento")
+    st.header("📅 Planejamento")
     with st.form("ev"):
-        dt = st.date_input("Data do Evento:")
-        tit = st.text_input("O que vamos fazer?")
+        dt = st.date_input("Data:")
+        nome = st.text_input("Evento:")
         if st.form_submit_button("Agendar"):
-            db["eventos"][dt.strftime("%Y-%m-%d")] = tit
-            save_all(db); st.success("Agendado!")
+            db["eventos"][dt.strftime("%Y-%m-%d")] = nome
+            save_all(db)
+            st.success("Agendado!")
 
-elif menu == "💡 Insights da IA":
-    st.header("💡 Insights do Especialista")
-    if st.button("Analisar Semana"):
-        ctx = str(list(db["registros"].items())[-7:])
-        prompt = f"Analise estes dados e as conversas de WhatsApp (se houver) para dar dicas de saúde emocional para o casal Jhonata e Katheryn: {ctx}"
-        res = client_groq.chat.completions.create(model="llama3-70b-8192", messages=[{"role":"user", "content":prompt}])
-        st.write(res.choices[0].message.content)
-
+# --- 6. CONFIGURAÇÕES ---
 elif menu == "⚙️ Configurações":
-    st.header("⚙️ Gerenciar Sistema")
-    # Lógica de descarte de opções multiselect (conforme v2.3)
-    if st.button("Limpar Opções 'Eu Fiz'"):
-        db["configuracoes"]["opcoes_eu_fiz"] = ["Flores", "Elogios", "Ajuda"]
-        save_all(db); st.success("Resetado!")
+    st.header("⚙️ Gestão de Opções")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.subheader("Opções: Eu Fiz")
+        for o in db["configuracoes"]["opcoes_eu_fiz"]:
+            if not st.checkbox(o, value=True, key=f"e_{o}"):
+                db["configuracoes"]["opcoes_eu_fiz"].remove(o)
+                save_all(db); st.rerun()
+    with c2:
+        st.subheader("Opções: Ela Fez")
+        for o in db["configuracoes"]["opcoes_ela_fez"]:
+            if not st.checkbox(o, value=True, key=f"k_{o}"):
+                db["configuracoes"]["opcoes_ela_fez"].remove(o)
+                save_all(db); st.rerun()
+
+# --- 7. IA INSIGHTS ---
+elif menu == "💡 Insights da IA":
+    st.header("💡 Análise do Especialista")
+    if st.button("Gerar Insights"):
+        recent = str(list(db["registros"].items())[-7:])
+        prompt = f"Analise o relacionamento de Jhonata e Katheryn com base nisso: {recent}. Foque em Linguagens do Amor e Acordos."
+        resp = client_groq.chat.completions.create(model="llama3-70b-8192", messages=[{"role":"user","content":prompt}])
+        st.write(resp.choices[0].message.content)
