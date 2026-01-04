@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 from datetime import datetime, date, timedelta
-from github import Github
+from github import Github, Auth # Importação atualizada
 from groq import Groq
 
 # Configuração da página
@@ -14,7 +14,10 @@ GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 GITHUB_REPO = st.secrets["GITHUB_REPO"]
 
 client_groq = Groq(api_key=GROQ_API_KEY)
-g = Github(GITHUB_TOKEN)
+
+# CORREÇÃO DO AVISO DE DEPRECIAÇÃO:
+auth = Auth.Token(GITHUB_TOKEN)
+g = Github(auth=auth)
 repo = g.get_repo(GITHUB_REPO)
 
 # --- FUNÇÕES DE DADOS ---
@@ -114,7 +117,6 @@ elif menu == "📅 Planejar Evento":
 # --- ABA 3: PAINEL 2026 (GRID) ---
 elif menu == "📊 Painel 2026":
     st.header("Visualização do Ano")
-    # Lógica de grid 365 dias (simplificada para o exemplo)
     all_days = pd.date_range(start="2026-01-01", end="2026-12-31")
     html_grid = '<div style="display: flex; flex-wrap: wrap; gap: 3px; max-width: 800px;">'
     for d in all_days:
@@ -123,7 +125,7 @@ elif menu == "📊 Painel 2026":
         if d_str in db["registros"]:
             color = "#216e39" if db["registros"][d_str].get("sexo") else "#9be9a8"
         if d_str in db["eventos"]:
-            color = "#ff9800" # Cor laranja para dias com evento
+            color = "#ff9800"
         html_grid += f'<div title="{d_str}" style="width: 13px; height: 13px; background-color: {color}; border-radius: 2px;"></div>'
     html_grid += '</div>'
     st.markdown(html_grid, unsafe_allow_html=True)
@@ -132,19 +134,19 @@ elif menu == "📊 Painel 2026":
 # --- ABA 4: INSIGHTS E DICAS ---
 elif menu == "💡 Insights e Dicas":
     st.header("Dicas do Especialista Groq")
-    
     hoje = date.today()
     proximos_eventos = {k: v for k, v in db["eventos"].items() if hoje <= datetime.strptime(k, "%Y-%m-%d").date() <= hoje + timedelta(days=7)}
 
     if st.button("🔄 Gerar Dica/Insight"):
+        # Pega os últimos registros para contexto
         contexto_passado = str(list(db["registros"].items())[-5:])
         
         if proximos_eventos:
-            prompt = f"Temos eventos vindo aí: {proximos_eventos}. Com base no histórico {contexto_passado}, me dê dicas de como me preparar para esses eventos e surpreender a Katheryn."
+            prompt = f"Temos eventos vindo aí: {proximos_eventos}. Com base no histórico {contexto_passado}, me dê dicas de como me preparar e surpreender a Katheryn."
         else:
             prompt = f"Analise nosso histórico recente: {contexto_passado}. Dê uma dica para melhorar nossa conexão amanhã."
 
-        with st.spinner("Analisando..."):
+        with st.spinner("Analisando dados..."):
             completion = client_groq.chat.completions.create(
                 model="llama3-70b-8192",
                 messages=[{"role": "user", "content": prompt}]
