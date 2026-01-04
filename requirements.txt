@@ -1,4 +1,4 @@
+PyGithub>=2.1.1
 streamlit
 pandas
-PyGithub
 groq
