@@ -1,16 +1,15 @@
 import streamlit as st
 import pandas as pd
 import json
-import re
+import io
 from datetime import datetime, date, timedelta
 from github import Github, Auth
 from groq import Groq
 from fpdf import FPDF
-import io
-from PIL import Image # Importar Pillow para manipulação de imagem
+from PIL import Image
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="Love Planner 4.9 - Jhonata & Katheryn", layout="wide", page_icon="❤️")
+st.set_page_config(page_title="Love Planner 4.11 - Full Edition", layout="wide", page_icon="❤️")
 
 # --- SEGURANÇA (SECRETS) ---
 try:
@@ -29,17 +28,20 @@ repo = g.get_repo(GITHUB_REPO)
 
 # --- CONSTANTES ---
 LINGUAGENS_LISTA = ["Atos de Serviço", "Palavras de Afirmação", "Tempo de Qualidade", "Toque Físico", "Presentes"]
+CATEGORIAS_DR = ["Comunicação", "Finanças", "Tempo Juntos", "Ciúmes/Insegurança", "Família", "Tarefas Domésticas", "Outros"]
 
 # --- FUNÇÕES DE DADOS ---
 def load_data():
     try:
         contents = repo.get_contents("data_2026.json")
         data = json.loads(contents.decoded_content.decode())
+        if "xp" not in data: data["xp"] = 0
         if "config" not in data: data["config"] = {"modelo_ia": "llama-3.3-70b-versatile"}
+        if "acordos_mestres" not in data: data["acordos_mestres"] = []
         return data
     except:
         return {
-            "registros": {}, "eventos": {}, "acordos_mestres": [], 
+            "registros": {}, "eventos": {}, "acordos_mestres": [], "xp": 0,
             "metas": {"elogios": 3, "qualidade": 2},
             "configuracoes": {"opcoes_eu_fiz": ["Elogio", "Tempo de Qualidade"], "opcoes_ela_fez": ["Carinho"]},
             "config": {"modelo_ia": "llama-3.3-70b-versatile"}
@@ -55,191 +57,158 @@ def save_all(data):
 
 db = load_data()
 
-# --- FUNÇÃO EXPORTAR PDF COM CAPA ---
+# --- GAMIFICAÇÃO (IDEIA 5) ---
+def get_nivel_info(xp):
+    nivel = int((xp / 100) ** 0.5) + 1
+    progresso = (xp % 100) / 100
+    return nivel, progresso
+
+# --- FUNÇÃO EXPORTAR PDF (V4.9) ---
 def gerar_pdf_com_capa(dados_mes, nome_mes, imagem_bytes=None):
     pdf = FPDF()
-
-    # Adicionar a Capa
     pdf.add_page()
     if imagem_bytes:
         try:
-            # Tenta abrir a imagem e redimensionar se for muito grande
             img = Image.open(io.BytesIO(imagem_bytes))
-            
-            # Manter proporção e ajustar à página
-            max_width = 180 # Largura máxima na página
-            max_height = 250 # Altura máxima na página
-
-            img_width, img_height = img.size
-            aspect_ratio = img_width / img_height
-
-            if img_width > max_width:
-                img_width = max_width
-                img_height = img_width / aspect_ratio
-            if img_height > max_height:
-                img_height = max_height
-                img_width = img_height * aspect_ratio
-
-            # Centralizar imagem
-            x = (210 - img_width) / 2
-            y = (297 - img_height) / 2 - 20 # Ajuste para título
-            
-            pdf.image(io.BytesIO(imagem_bytes), x=x, y=y, w=img_width, h=img_height)
-        except Exception as e:
-            st.warning(f"Não foi possível processar a imagem. Erro: {e}")
-            # Se der erro, continua sem a imagem mas com título
+            pdf.image(io.BytesIO(imagem_bytes), x=15, y=50, w=180)
+        except: pass
     
     pdf.set_font("Arial", "B", 24)
-    pdf.set_text_color(255, 0, 0) # Cor vermelha
-    pdf.text(70, 30, f"Nossas Memórias de {nome_mes}")
-    pdf.set_text_color(0, 0, 0) # Volta ao preto
+    pdf.set_text_color(200, 0, 0)
+    pdf.text(60, 30, f"Memórias de {nome_mes}")
     pdf.set_font("Arial", "I", 14)
-    pdf.text(80, 40, "Jhonata & Katheryn - 2026")
-    pdf.add_page() # Nova página para o conteúdo
-
-    # Conteúdo do Diário
+    pdf.text(75, 40, "Jhonata & Katheryn - 2026")
+    
+    pdf.add_page()
     pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, f"Detalhes do Mês de {nome_mes}", ln=True, align='C')
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 10, f"Relatório Detalhado", ln=True, align='C')
     pdf.ln(10)
     
-    for data, info in sorted(dados_mes.items()):
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(0, 10, f"Dia: {data} - Nota: {info.get('nota', 'N/A')}", ln=True)
+    for d, i in sorted(dados_mes.items()):
+        pdf.set_font("Arial", "B", 11)
+        pdf.cell(0, 8, f"Data: {d} | Nota: {i.get('nota')}", ln=True)
         pdf.set_font("Arial", "", 10)
-        resumo = info.get('resumo', 'Sem resumo registrado.')
-        pdf.multi_cell(0, 5, f"Resumo: {resumo}")
-        
-        # Adiciona detalhes do WhatsApp se existirem
-        if info.get('whatsapp_txt'):
-            pdf.set_font("Arial", "I", 8)
-            pdf.multi_cell(0, 4, f"WhatsApp: {info['whatsapp_txt'][:200]}...") # Limita para não sobrecarregar
-            pdf.ln(2)
-        
-        pdf.ln(5)
-    
+        pdf.multi_cell(0, 5, f"Resumo: {i.get('resumo', '')}")
+        if i.get('gratidao'):
+            pdf.set_font("Arial", "I", 10)
+            pdf.set_text_color(100, 100, 100)
+            pdf.multi_cell(0, 5, f"Gratidão: {i['gratidao']}")
+            pdf.set_text_color(0, 0, 0)
+        pdf.ln(4)
     return pdf.output()
 
-# --- NAVEGAÇÃO ---
-st.sidebar.title("❤️ Love Planner 4.9")
-menu = st.sidebar.radio("Navegação:", ["📝 Diário", "📊 Painel & Grids", "🤝 Acordos", "⏳ Cápsula do Tempo", "📅 Eventos", "💡 Insights da IA", "⚙️ Configurações"])
+# --- BARRA LATERAL (IDEIA 5) ---
+nivel, prog = get_nivel_info(db["xp"])
+st.sidebar.title(f"❤️ Love Planner 4.11")
+st.sidebar.subheader(f"Nível de Conexão: {nivel}")
+st.sidebar.progress(prog)
+st.sidebar.caption(f"XP Total: {db['xp']}")
 
-# --- 1. ABA DIÁRIO ---
+menu = st.sidebar.radio("Navegação:", ["📝 Diário", "📊 Painel & Grids", "🤝 Acordos", "⏳ Cápsula do Tempo", "📅 Eventos", "💡 Insights IA", "⚙️ Configurações"])
+
+# --- 1. DIÁRIO (IDEIA 1, 2, 3) ---
 if menu == "📝 Diário":
     st.header("📝 Registro Diário")
-    selected_date = st.date_input("Data do Registro:", date.today())
+    selected_date = st.date_input("Data:", date.today())
     date_str = selected_date.strftime("%Y-%m-%d")
     day_data = db["registros"].get(date_str, {})
     is_locked = day_data.get("locked", False)
 
+    # IDEIA 1: Alerta do Termômetro
+    notas = [v['nota'] for v in list(db['registros'].values())[-3:] if 'nota' in v]
+    if notas and (sum(notas)/len(notas)) < 5:
+        st.error("🌡️ Alerta: A média de felicidade caiu! Que tal uma conversa carinhosa hoje?")
+
     if is_locked:
-        st.warning("🔒 Dia trancado.")
+        st.warning("🔒 Este dia está trancado.")
         if st.button("🔓 Destrancar"):
             db["registros"][date_str]["locked"] = False
             save_all(db); st.rerun()
 
-    with st.form("form_v49"):
-        nota = st.select_slider("Nota do Relacionamento:", options=range(1,11), value=day_data.get("nota", 7), disabled=is_locked)
+    with st.form("diario_v11"):
+        nota = st.select_slider("Nota do Relacionamento:", range(1,11), value=day_data.get("nota", 7), disabled=is_locked)
+        # IDEIA 2: Gratidão
+        gratidao = st.text_input("Gratidão do dia (O que ela fez de bom?):", value=day_data.get("gratidao", ""), disabled=is_locked)
         
-        acordos_ativos = [a for a in db.get("acordos_mestres", []) if a.get("monitorar")]
-        checks_acordos_hoje = {}
-        if acordos_ativos:
-            st.subheader("🎯 Acordos")
-            cols_ac = st.columns(len(acordos_ativos))
-            for i, ac in enumerate(acordos_ativos):
-                label = ac['nome_curto']
-                checks_acordos_hoje[label] = cols_ac[i].checkbox(label, value=day_data.get("checks_acordos", {}).get(label, False), disabled=is_locked)
-
         col1, col2 = st.columns(2)
         with col1:
-            st.subheader("Jhonata")
-            op_eu = db["configuracoes"]["opcoes_eu_fiz"] + ["Outro"]
-            eu_fiz = st.multiselect("Eu fiz:", op_eu, [x for x in day_data.get("eu_fiz", []) if x in op_eu], disabled=is_locked)
-            novo_eu = st.text_input("Novo (Eu):") if "Outro" in eu_fiz else ""
-            ling_eu = st.multiselect("Minhas Linguagens:", LINGUAGENS_LISTA, day_data.get("ling_eu", []), disabled=is_locked)
+            eu_fiz = st.multiselect("Eu fiz:", db["configuracoes"]["opcoes_eu_fiz"], day_data.get("eu_fiz", []), disabled=is_locked)
             disc = st.checkbox("Houve discussão?", day_data.get("discussao", False), disabled=is_locked)
+            # IDEIA 3: Categorização DR
+            cat_dr = st.selectbox("Motivo da DR:", CATEGORIAS_DR, disabled=not disc or is_locked)
+            
         with col2:
-            st.subheader("Katheryn")
-            op_ela = db["configuracoes"]["opcoes_ela_fez"] + ["Outro"]
-            ela_fez = st.multiselect("Ela fez:", op_ela, [x for x in day_data.get("ela_fez", []) if x in op_ela], disabled=is_locked)
-            novo_ela = st.text_input("Novo (Ela):") if "Outro" in ela_fez else ""
-            ling_ela = st.multiselect("Linguagens dela:", LINGUAGENS_LISTA, day_data.get("ling_ela", []), disabled=is_locked)
-            sexo = st.radio("Houve sexo?", ["Sim", "Não"], index=0 if day_data.get("sexo", True) else 1, disabled=is_locked)
+            ela_fez = st.multiselect("Ela fez:", db["configuracoes"]["opcoes_ela_fez"], day_data.get("ela_fez", []), disabled=is_locked)
+            sexo = st.radio("Sexo?", ["Sim", "Não"], index=0 if day_data.get("sexo", True) else 1, disabled=is_locked)
 
-        st.divider()
-        with st.expander("💬 Importar WhatsApp"):
-            ws_raw = st.text_area("Cole a conversa do WhatsApp aqui:")
-            if day_data.get("whatsapp_txt"):
-                st.code(day_data["whatsapp_txt"])
+        with st.expander("💬 WhatsApp"):
+            ws_raw = st.text_area("Importar conversa:")
+            if day_data.get("whatsapp_txt"): st.code(day_data["whatsapp_txt"])
         
-        resumo = st.text_area("Resumo do dia:", day_data.get("resumo", ""), disabled=is_locked)
+        resumo = st.text_area("Resumo do Dia:", day_data.get("resumo", ""), disabled=is_locked)
         
-        if st.form_submit_button("💾 Salvar e Trancar") and not is_locked:
-            f_eu = [i for i in eu_fiz if i != "Outro"]; f_ela = [i for i in ela_fez if i != "Outro"]
-            if novo_eu and novo_eu not in db["configuracoes"]["opcoes_eu_fiz"]: db["configuracoes"]["opcoes_eu_fiz"].append(novo_eu); f_eu.append(novo_eu)
-            if novo_ela and novo_ela not in db["configuracoes"]["opcoes_ela_fez"]: db["configuracoes"]["opcoes_ela_fez"].append(novo_ela); f_ela.append(novo_ela)
-
+        if st.form_submit_button("💾 Salvar Registro") and not is_locked:
+            # Gamificação (IDEIA 5)
+            if date_str not in db["registros"]: db["xp"] += 15
+            if gratidao: db["xp"] += 5
+            if not disc: db["xp"] += 10
+            
             ws_final = day_data.get("whatsapp_txt", "")
             if ws_raw:
                 target = selected_date.strftime("%d/%m/%y")
-                ws_final = "\n".join([line for line in ws_raw.split('\n') if target in line])
+                ws_final = "\n".join([l for l in ws_raw.split('\n') if target in l])
 
             db["registros"][date_str] = {
-                "nota": nota, "eu_fiz": f_eu, "ela_fez": f_ela, "ling_eu": ling_eu, "ling_ela": ling_ela,
-                "discussao": disc, "sexo": sexo == "Sim", "resumo": resumo,
-                "whatsapp_txt": ws_final, "checks_acordos": checks_acordos_hoje, "locked": True
+                "nota": nota, "gratidao": gratidao, "eu_fiz": eu_fiz, "ela_fez": ela_fez,
+                "discussao": disc, "cat_dr": cat_dr if disc else None, "sexo": sexo == "Sim",
+                "resumo": resumo, "whatsapp_txt": ws_final, "locked": True
             }
-            save_all(db); st.rerun()
+            save_all(db); st.success("XP Ganho!"); st.rerun()
 
-# --- 2. PAINEL & GRIDS (COM UPLOAD DE FOTO) ---
+# --- 2. PAINEL (IDEIA 1, 3) ---
 elif menu == "📊 Painel & Grids":
-    st.header("📊 Retrospectiva & Exportação")
+    st.header("📊 Painel de Controle 2026")
     
-    # Exportação PDF com Capa
-    st.subheader("📥 Exportar Diário para PDF")
-    meses_dict = {"01": "Janeiro", "02": "Fevereiro", "03": "Março", "04": "Abril", "05": "Maio", "06": "Junho", 
-                  "07": "Julho", "08": "Agosto", "09": "Setembro", "10": "Outubro", "11": "Novembro", "12": "Dezembro"}
-    mes_sel = st.selectbox("Selecione o mês para exportar:", list(meses_dict.values()), key="sel_mes_pdf")
-    cod_mes = [k for k, v in meses_dict.items() if v == mes_sel][0]
+    # IDEIA 3: Gráfico de DR
+    drs = [r.get("cat_dr") for r in db["registros"].values() if r.get("discussao") and r.get("cat_dr")]
+    if drs:
+        col_dr, col_term = st.columns(2)
+        with col_dr:
+            st.subheader("⚠️ Motivos de Conflito")
+            st.bar_chart(pd.Series(drs).value_counts())
+        with col_term:
+            st.subheader("🌡️ Tendência de Felicidade")
+            df_notas = pd.DataFrame([{"Data": k, "Nota": v["nota"]} for k, v in db["registros"].items()])
+            if not df_notas.empty: st.line_chart(df_notas.set_index("Data"))
 
-    uploaded_file = st.file_uploader("Escolha uma imagem para a capa (opcional):", type=["jpg", "jpeg", "png"])
-    imagem_capa_bytes = None
-    if uploaded_file is not None:
-        imagem_capa_bytes = uploaded_file.read()
-        st.image(uploaded_file, caption='Sua imagem de capa', width=200)
-    
-    if st.button("Gerar PDF do Mês com Capa"):
-        dados_mes = {k: v for k, v in db["registros"].items() if k.split("-")[1] == cod_mes}
-        if dados_mes:
-            pdf_bytes_output = gerar_pdf_com_capa(dados_mes, mes_sel, imagem_capa_bytes)
-            st.download_button(label="⬇️ Baixar PDF com Capa", data=pdf_bytes_output, file_name=f"Memorias_{mes_sel}_2026.pdf", mime="application/pdf")
-        else:
-            st.warning("Nenhum registro encontrado para este mês.")
-
+    # Exportação PDF (V4.9)
     st.divider()
-    def draw_grid(title, metric, color):
-        st.write(f"#### {title}")
-        days = pd.date_range("2026-01-01", "2026-12-31")
-        grid = '<div style="display: flex; flex-wrap: wrap; gap: 3px; max-width: 900px; margin-bottom: 20px;">'
-        for d in days:
-            ds = d.strftime("%Y-%m-%d")
-            reg = db["registros"].get(ds, {})
-            c = "#ebedf0"
-            if ds in db["registros"]:
-                if metric == "nota":
-                    n = reg.get("nota", 0)
-                    c = "#216e39" if n >= 8 else "#f9d71c" if n >= 5 else "#f44336"
-                elif metric in LINGUAGENS_LISTA:
-                    c = color if metric in reg.get("ling_eu", []) or metric in reg.get("ling_ela", []) else "#ebedf0"
-                else: c = color if reg.get(metric) else "#ebedf0"
-            grid += f'<div title="{ds}" style="width: 12px; height: 12px; background-color: {c}; border-radius: 2px;"></div>'
-        st.markdown(grid + '</div>', unsafe_allow_html=True)
-    draw_grid("⭐ Notas", "nota", "")
-    draw_grid("🔥 Sexo", "sexo", "#e91e63")
-    draw_grid("⚠️ Discussões", "discussao", "#f44336")
+    st.subheader("📥 Exportar Mês")
+    col_pdf1, col_pdf2 = st.columns(2)
+    with col_pdf1:
+        mes_sel = st.selectbox("Mês:", ["01","02","03","04","05","06","07","08","09","10","11","12"])
+        up_img = st.file_uploader("Foto de Capa:", type=["png","jpg"])
+    with col_pdf2:
+        if st.button("Gerar PDF"):
+            dados_mes = {k: v for k, v in db["registros"].items() if k.split("-")[1] == mes_sel}
+            img_bytes = up_img.read() if up_img else None
+            pdf_out = gerar_pdf_com_capa(dados_mes, mes_sel, img_bytes)
+            st.download_button("Download PDF", pdf_out, f"Amor_{mes_sel}.pdf")
 
-# --- DEMAIS ABAS ---
+# --- 3. INSIGHTS IA ---
+elif menu == "💡 Insights IA":
+    st.header("💡 Análise do Especialista")
+    if st.button("Analisar registros"):
+        ctx = "".join([f"\nData: {d} | Nota: {i.get('nota')} | DR: {i.get('cat_dr')} | Gratidão: {i.get('gratidao')}" for d, i in list(db["registros"].items())[-5:]])
+        try:
+            resp = client_groq.chat.completions.create(model=db["config"]["modelo_ia"], messages=[{"role":"user","content":f"Como terapeuta, analise Jhonata e Katheryn: {ctx}"}], max_tokens=800)
+            st.info(resp.choices[0].message.content)
+        except Exception as e: st.error(f"Erro: {e}")
+
+# --- DEMAIS ABAS (ACORDOS, CONFIGS, EVENTOS) ---
 elif menu == "🤝 Acordos":
-    st.header("🤝 Central de Acordos")
+    st.header("🤝 Acordos")
     with st.form("ac"):
         t = st.text_input("Acordo:"); c = st.text_input("Nome Curto:"); m = st.checkbox("Monitorar?")
         if st.form_submit_button("Firmar"):
@@ -247,33 +216,22 @@ elif menu == "🤝 Acordos":
             save_all(db); st.rerun()
     for i, ac in enumerate(db["acordos_mestres"]):
         st.write(f"- {ac['nome_curto']}: {ac['titulo']}")
-        if st.button("Excluir", key=f"d_a_{i}"): db["acordos_mestres"].pop(i); save_all(db); st.rerun()
-
-elif menu == "💡 Insights da IA":
-    st.header("💡 Análise do Especialista")
-    if st.button("Gerar Insights"):
-        recentes = list(db["registros"].items())[-5:]
-        ctx = "".join([f"\nData: {d} | Nota: {i.get('nota')} | Resumo: {i.get('resumo')[:150]}" for d, i in recentes])
-        if not ctx: st.warning("Sem registros!")
-        else:
-            try:
-                resp = client_groq.chat.completions.create(model=db["config"]["modelo_ia"], messages=[{"role":"user","content":f"Analise: {ctx}"}], max_tokens=1000)
-                st.markdown(resp.choices[0].message.content)
-            except Exception as e: st.error(f"Erro: {e}")
+        if st.button("Remover", key=f"del_{i}"): db["acordos_mestres"].pop(i); save_all(db); st.rerun()
 
 elif menu == "⚙️ Configurações":
-    st.header("⚙️ Configurações")
-    db["config"]["modelo_ia"] = st.text_input("ID do Modelo Groq:", value=db["config"].get("modelo_ia", "llama-3.3-70b-versatile"))
-    if st.button("Salvar Configs"): save_all(db); st.success("Salvo!")
-
-elif menu == "⏳ Cápsula do Tempo":
-    st.header("⏳ Memórias")
-    for d in [30, 90]:
-        alvo = (date.today() - timedelta(days=d)).strftime("%Y-%m-%d")
-        if alvo in db["registros"]: st.info(f"📅 Há {d} dias: {db['registros'][alvo].get('resumo')}")
+    st.header("⚙️ Configs")
+    db["config"]["modelo_ia"] = st.text_input("Modelo Groq:", value=db["config"].get("modelo_ia"))
+    if st.button("Salvar"): save_all(db); st.success("Ok!")
 
 elif menu == "📅 Eventos":
     st.header("📅 Calendário")
-    with st.form("e"):
-        dt = st.date_input("Data:"); n = st.text_input("Evento:")
-        if st.form_submit_button("Agendar"): db["eventos"][dt.strftime("%Y-%m-%d")] = n; save_all(db); st.rerun()
+    with st.form("ev"):
+        dt = st.date_input("Data:"); ev = st.text_input("Evento:")
+        if st.form_submit_button("Salvar"): db["eventos"][str(dt)] = ev; save_all(db); st.rerun()
+    for d, e in db["eventos"].items(): st.write(f"**{d}:** {e}")
+
+elif menu == "⏳ Cápsula do Tempo":
+    st.header("⏳ Memórias Antigas")
+    for d in [30, 90]:
+        alvo = (date.today() - timedelta(days=d)).strftime("%Y-%m-%d")
+        if alvo in db["registros"]: st.info(f"Há {d} dias: {db['registros'][alvo].get('resumo')}")
