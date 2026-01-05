@@ -67,11 +67,11 @@
                 "Tempo de Qualidade"
             ],
             "discussao": false,
-            "sexo": true,
-            "resumo": "",
+            "sexo": false,
+            "resumo": "Viajamos de moto para Saquarema com os pais de Katheryn. Foi uma viagem divertida na minha opinião, mas nem tanto na de Katheryn. Passamos primeiramente na casa do tio de katheryn, tio Tatá, mas o companheiro dele já teve problemas no passado com Katheryn e com o pai dela. Então, quando chamaram ele para ir na praia com a gente , minha esposa se sentiu muito desconfortável e só queria ir embora. Quando voltamos para casa, exaustos, conversamos , rimos e formos descansar. ",
             "whatsapp_txt": "",
             "checks_acordos": {},
-            "locked": false
+            "locked": true
         }
     },
     "eventos": {
