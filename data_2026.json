@@ -55,6 +55,23 @@
             "whatsapp_txt": "",
             "checks_acordos": {},
             "locked": true
+        },
+        "2026-01-03": {
+            "nota": 7,
+            "eu_fiz": [
+                "Apoio"
+            ],
+            "ela_fez": [],
+            "ling_eu": [],
+            "ling_ela": [
+                "Tempo de Qualidade"
+            ],
+            "discussao": false,
+            "sexo": true,
+            "resumo": "",
+            "whatsapp_txt": "",
+            "checks_acordos": {},
+            "locked": true
         }
     },
     "eventos": {
@@ -66,7 +83,8 @@
             "Flores",
             "Elogios",
             "Ajuda",
-            "Ouvir"
+            "Ouvir",
+            "Apoio"
         ],
         "opcoes_ela_fez": [
             "Carinho",
