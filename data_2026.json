@@ -35,6 +35,26 @@
             "whatsapp_txt": "",
             "checks_acordos": {},
             "locked": true
+        },
+        "2026-01-02": {
+            "nota": 5,
+            "eu_fiz": [],
+            "ela_fez": [
+                "Cuidado"
+            ],
+            "ling_eu": [
+                "Atos de Serviço",
+                "Tempo de Qualidade"
+            ],
+            "ling_ela": [
+                "Tempo de Qualidade"
+            ],
+            "discussao": false,
+            "sexo": true,
+            "resumo": "Tentamos passar um dia melhor. Fomos almoçar em um restaurante, e decidimos que quando saímos da pousada para voltar de viagem, iriamos tentar evitar tocar nesses assuntos espinhosos para fazer o dia ser melhor. De fato foi um dia mais leve que o anterior. ",
+            "whatsapp_txt": "",
+            "checks_acordos": {},
+            "locked": true
         }
     },
     "eventos": {
