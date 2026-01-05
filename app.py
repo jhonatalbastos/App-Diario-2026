@@ -7,14 +7,14 @@ from github import Github, Auth
 from groq import Groq
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="Love Planner 4.0", layout="wide", page_icon="❤️")
+st.set_page_config(page_title="Love Planner 4.0 - Jhonata & Katheryn", layout="wide", page_icon="❤️")
 
 # --- SEGURANÇA (SECRETS) ---
 try:
     GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
     GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
     GITHUB_REPO = st.secrets["GITHUB_REPO"]
-except Exception as e:
+except Exception:
     st.error("Erro nos Secrets. Verifique as chaves no Streamlit Cloud.")
     st.stop()
 
@@ -32,7 +32,6 @@ def load_data():
     try:
         contents = repo.get_contents("data_2026.json")
         data = json.loads(contents.decoded_content.decode())
-        # Garantir chaves básicas
         if "registros" not in data: data["registros"] = {}
         if "eventos" not in data: data["eventos"] = {}
         if "acordos_mestres" not in data: data["acordos_mestres"] = []
@@ -56,14 +55,14 @@ def save_all(data):
     file_path = "data_2026.json"
     try:
         contents = repo.get_contents(file_path)
-        repo.update_file(contents.path, f"Sincronização {datetime.now()}", json_data, contents.sha)
+        repo.update_file(contents.path, f"Sync {datetime.now()}", json_data, contents.sha)
     except:
         repo.create_file(file_path, "Início do Banco de Dados", json_data)
 
 db = load_data()
 
 # --- NAVEGAÇÃO LATERAL ---
-st.sidebar.title("❤️ Love Planner 4.0")
+st.sidebar.title("❤️ Love Planner 2026")
 menu = st.sidebar.radio("Navegação:", ["📝 Diário", "🤝 Central de Acordos", "📊 Painel & Grids", "⏳ Cápsula do Tempo", "📅 Eventos", "⚙️ Configurações", "💡 Insights da IA"])
 
 # --- 1. ABA DIÁRIO ---
@@ -75,16 +74,16 @@ if menu == "📝 Diário":
     is_locked = day_data.get("locked", False)
 
     if is_locked:
-        st.warning("🔒 Este dia está trancado.")
-        if st.button("🔓 Destrancar"):
+        st.warning(f"🔒 Este registro ({selected_date.strftime('%d/%m/%Y')}) está trancado.")
+        if st.button("🔓 Destrancar para Editar"):
             db["registros"][date_str]["locked"] = False
             save_all(db)
             st.rerun()
 
     with st.form("form_diario"):
-        nota = st.select_slider("Como foi o dia? (1-Vermelho, 10-Verde):", options=range(1, 11), value=day_data.get("nota", 7), disabled=is_locked)
+        nota = st.select_slider("Nota do Dia (1-Vermelho, 10-Verde):", options=range(1, 11), value=day_data.get("nota", 7), disabled=is_locked)
         
-        # Checkbox de Acordos Firmados
+        # Checkbox de Acordos Ativos
         acordos_ativos = [a for a in db["acordos_mestres"] if a.get("monitorar")]
         checks_acordos_hoje = {}
         if acordos_ativos:
@@ -101,8 +100,7 @@ if menu == "📝 Diário":
             st.subheader("Jhonata (Eu)")
             op_eu = db["configuracoes"]["opcoes_eu_fiz"] + ["Outro"]
             eu_fiz = st.multiselect("O que eu fiz por ela:", op_eu, [x for x in day_data.get("eu_fiz", []) if x in op_eu], disabled=is_locked)
-            novo_eu = st.text_input("Adicionar nova opção (Eu):") if "Outro" in eu_fiz else ""
-            
+            novo_eu = st.text_input("Nova opção (Eu):", key="n_eu") if "Outro" in eu_fiz else ""
             ling_eu = st.multiselect("Minhas Linguagens hoje:", LINGUAGENS_LISTA, day_data.get("ling_eu", []), disabled=is_locked)
             disc = st.checkbox("Houve discussão?", day_data.get("discussao", False), disabled=is_locked)
 
@@ -110,44 +108,50 @@ if menu == "📝 Diário":
             st.subheader("Katheryn (Ela)")
             op_ela = db["configuracoes"]["opcoes_ela_fez"] + ["Outro"]
             ela_fez = st.multiselect("O que ela fez por mim:", op_ela, [x for x in day_data.get("ela_fez", []) if x in op_ela], disabled=is_locked)
-            novo_ela = st.text_input("Adicionar nova opção (Ela):") if "Outro" in ela_fez else ""
-            
+            novo_ela = st.text_input("Nova opção (Ela):", key="n_ela") if "Outro" in ela_fez else ""
             ling_ela = st.multiselect("Linguagens dela hoje:", LINGUAGENS_LISTA, day_data.get("ling_ela", []), disabled=is_locked)
             sexo = st.radio("Houve sexo?", ["Sim", "Não"], index=0 if day_data.get("sexo", True) else 1, disabled=is_locked)
 
         st.divider()
         with st.expander("💬 Importar Conversa do WhatsApp (Opcional)"):
-            ws_raw = st.text_area("Cole a conversa aqui (apenas mensagens do dia serão salvas):")
+            ws_raw = st.text_area("Cole a conversa aqui. O sistema filtrará apenas as mensagens deste dia.")
         
         resumo = st.text_area("Resumo livre/Notas importantes:", day_data.get("resumo", ""), disabled=is_locked)
+        
+        # O botão agora fica fora da condição is_locked para evitar o erro "Missing Submit Button"
+        # mas ele só processa o salvamento se não estiver trancado.
+        btn_salvar = st.form_submit_button("💾 Salvar e Trancar Registro")
 
-        if not is_locked and st.form_submit_button("💾 Salvar e Trancar Registro"):
-            # Processar 'Outros'
-            f_eu = [i for i in eu_fiz if i != "Outro"]
-            if novo_eu and novo_eu not in db["configuracoes"]["opcoes_eu_fiz"]:
-                db["configuracoes"]["opcoes_eu_fiz"].append(novo_eu)
-                f_eu.append(novo_eu)
-            
-            f_ela = [i for i in ela_fez if i != "Outro"]
-            if novo_ela and novo_ela not in db["configuracoes"]["opcoes_ela_fez"]:
-                db["configuracoes"]["opcoes_ela_fez"].append(novo_ela)
-                f_ela.append(novo_ela)
+        if btn_salvar:
+            if is_locked:
+                st.error("Este dia está trancado. Destranque-o para poder salvar alterações.")
+            else:
+                # Processar 'Outros'
+                f_eu = [i for i in eu_fiz if i != "Outro"]
+                if novo_eu and novo_eu not in db["configuracoes"]["opcoes_eu_fiz"]:
+                    db["configuracoes"]["opcoes_eu_fiz"].append(novo_eu)
+                    f_eu.append(novo_eu)
+                
+                f_ela = [i for i in ela_fez if i != "Outro"]
+                if novo_ela and novo_ela not in db["configuracoes"]["opcoes_ela_fez"]:
+                    db["configuracoes"]["opcoes_ela_fez"].append(novo_ela)
+                    f_ela.append(novo_ela)
 
-            # Filtrar WhatsApp por data (ex: 04/01/26)
-            ws_final = day_data.get("whatsapp_txt", "")
-            if ws_raw:
-                target = selected_date.strftime("%d/%m/%y")
-                ws_final = "\n".join([line for line in ws_raw.split('\n') if target in line])
+                # Filtrar WhatsApp por data
+                ws_final = day_data.get("whatsapp_txt", "")
+                if ws_raw:
+                    target = selected_date.strftime("%d/%m/%y")
+                    ws_final = "\n".join([line for line in ws_raw.split('\n') if target in line])
 
-            db["registros"][date_str] = {
-                "nota": nota, "eu_fiz": f_eu, "ela_fez": f_ela,
-                "ling_eu": ling_eu, "ling_ela": ling_ela,
-                "discussao": disc, "sexo": sexo == "Sim", "resumo": resumo,
-                "whatsapp_txt": ws_final, "checks_acordos": checks_acordos_hoje, "locked": True
-            }
-            save_all(db)
-            st.success("Salvo com sucesso!")
-            st.rerun()
+                db["registros"][date_str] = {
+                    "nota": nota, "eu_fiz": f_eu, "ela_fez": f_ela,
+                    "ling_eu": ling_eu, "ling_ela": ling_ela,
+                    "discussao": disc, "sexo": sexo == "Sim", "resumo": resumo,
+                    "whatsapp_txt": ws_final, "checks_acordos": checks_acordos_hoje, "locked": True
+                }
+                save_all(db)
+                st.success("Salvo com sucesso!")
+                st.rerun()
 
 # --- 2. CENTRAL DE ACORDOS ---
 elif menu == "🤝 Central de Acordos":
@@ -204,9 +208,10 @@ elif menu == "📊 Painel & Grids":
 elif menu == "⏳ Cápsula do Tempo":
     st.header("⏳ Memórias")
     for d in [30, 90, 180]:
-        alvo = (date.today() - timedelta(days=d)).strftime("%Y-%m-%d")
+        alvo_dt = (date.today() - timedelta(days=d))
+        alvo = alvo_dt.strftime("%Y-%m-%d")
         if alvo in db["registros"]:
-            st.info(f"📅 Há {d} dias ({alvo}): {db['registros'][alvo].get('resumo')}")
+            st.info(f"📅 Há {d} dias ({alvo_dt.strftime('%d/%m/%Y')}): {db['registros'][alvo].get('resumo')}")
 
 # --- 5. EVENTOS ---
 elif menu == "📅 Eventos":
@@ -225,16 +230,20 @@ elif menu == "⚙️ Configurações":
     c1, c2 = st.columns(2)
     with c1:
         st.subheader("Opções: Eu Fiz")
-        for o in db["configuracoes"]["opcoes_eu_fiz"]:
+        opcoes_eu = list(db["configuracoes"]["opcoes_eu_fiz"])
+        for o in opcoes_eu:
             if not st.checkbox(o, value=True, key=f"e_{o}"):
                 db["configuracoes"]["opcoes_eu_fiz"].remove(o)
-                save_all(db); st.rerun()
+                save_all(db)
+                st.rerun()
     with c2:
         st.subheader("Opções: Ela Fez")
-        for o in db["configuracoes"]["opcoes_ela_fez"]:
+        opcoes_ela = list(db["configuracoes"]["opcoes_ela_fez"])
+        for o in opcoes_ela:
             if not st.checkbox(o, value=True, key=f"k_{o}"):
                 db["configuracoes"]["opcoes_ela_fez"].remove(o)
-                save_all(db); st.rerun()
+                save_all(db)
+                st.rerun()
 
 # --- 7. IA INSIGHTS ---
 elif menu == "💡 Insights da IA":
