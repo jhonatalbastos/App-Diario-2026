@@ -7,7 +7,7 @@ from github import Github, Auth
 from groq import Groq
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="Love Planner 4.0 - Jhonata & Katheryn", layout="wide", page_icon="❤️")
+st.set_page_config(page_title="Love Planner 4.1", layout="wide", page_icon="❤️")
 
 # --- SEGURANÇA (SECRETS) ---
 try:
@@ -62,7 +62,7 @@ def save_all(data):
 db = load_data()
 
 # --- NAVEGAÇÃO LATERAL ---
-st.sidebar.title("❤️ Love Planner 2026")
+st.sidebar.title("❤️ Love Planner 4.1")
 menu = st.sidebar.radio("Navegação:", ["📝 Diário", "🤝 Central de Acordos", "📊 Painel & Grids", "⏳ Cápsula do Tempo", "📅 Eventos", "⚙️ Configurações", "💡 Insights da IA"])
 
 # --- 1. ABA DIÁRIO ---
@@ -74,7 +74,7 @@ if menu == "📝 Diário":
     is_locked = day_data.get("locked", False)
 
     if is_locked:
-        st.warning(f"🔒 Este registro ({selected_date.strftime('%d/%m/%Y')}) está trancado.")
+        st.warning(f"🔒 Este dia ({selected_date.strftime('%d/%m/%Y')}) está trancado.")
         if st.button("🔓 Destrancar para Editar"):
             db["registros"][date_str]["locked"] = False
             save_all(db)
@@ -83,7 +83,6 @@ if menu == "📝 Diário":
     with st.form("form_diario"):
         nota = st.select_slider("Nota do Dia (1-Vermelho, 10-Verde):", options=range(1, 11), value=day_data.get("nota", 7), disabled=is_locked)
         
-        # Checkbox de Acordos Ativos
         acordos_ativos = [a for a in db["acordos_mestres"] if a.get("monitorar")]
         checks_acordos_hoje = {}
         if acordos_ativos:
@@ -95,7 +94,6 @@ if menu == "📝 Diário":
 
         st.divider()
         col1, col2 = st.columns(2)
-        
         with col1:
             st.subheader("Jhonata (Eu)")
             op_eu = db["configuracoes"]["opcoes_eu_fiz"] + ["Outro"]
@@ -114,19 +112,15 @@ if menu == "📝 Diário":
 
         st.divider()
         with st.expander("💬 Importar Conversa do WhatsApp (Opcional)"):
-            ws_raw = st.text_area("Cole a conversa aqui. O sistema filtrará apenas as mensagens deste dia.")
+            ws_raw = st.text_area("Cole a conversa aqui.")
         
         resumo = st.text_area("Resumo livre/Notas importantes:", day_data.get("resumo", ""), disabled=is_locked)
-        
-        # O botão agora fica fora da condição is_locked para evitar o erro "Missing Submit Button"
-        # mas ele só processa o salvamento se não estiver trancado.
         btn_salvar = st.form_submit_button("💾 Salvar e Trancar Registro")
 
         if btn_salvar:
             if is_locked:
-                st.error("Este dia está trancado. Destranque-o para poder salvar alterações.")
+                st.error("Dia trancado.")
             else:
-                # Processar 'Outros'
                 f_eu = [i for i in eu_fiz if i != "Outro"]
                 if novo_eu and novo_eu not in db["configuracoes"]["opcoes_eu_fiz"]:
                     db["configuracoes"]["opcoes_eu_fiz"].append(novo_eu)
@@ -137,7 +131,6 @@ if menu == "📝 Diário":
                     db["configuracoes"]["opcoes_ela_fez"].append(novo_ela)
                     f_ela.append(novo_ela)
 
-                # Filtrar WhatsApp por data
                 ws_final = day_data.get("whatsapp_txt", "")
                 if ws_raw:
                     target = selected_date.strftime("%d/%m/%y")
@@ -150,30 +143,9 @@ if menu == "📝 Diário":
                     "whatsapp_txt": ws_final, "checks_acordos": checks_acordos_hoje, "locked": True
                 }
                 save_all(db)
-                st.success("Salvo com sucesso!")
                 st.rerun()
 
-# --- 2. CENTRAL DE ACORDOS ---
-elif menu == "🤝 Central de Acordos":
-    st.header("🤝 Gestão de Acordos")
-    with st.form("novo_ac"):
-        t = st.text_input("Descrição do Acordo:")
-        c = st.text_input("Nome Curto (Checklist):")
-        m = st.checkbox("Monitorar diariamente no Diário?")
-        if st.form_submit_button("Firmar Acordo"):
-            db["acordos_mestres"].append({"titulo": t, "nome_curto": c, "monitorar": m, "data": str(date.today())})
-            save_all(db)
-            st.rerun()
-
-    st.subheader("Acordos Firmados")
-    for i, ac in enumerate(db["acordos_mestres"]):
-        st.write(f"- **{ac['nome_curto']}**: {ac['titulo']} (Desde: {ac['data']})")
-        if st.button("Remover", key=f"del_{i}"):
-            db["acordos_mestres"].pop(i)
-            save_all(db)
-            st.rerun()
-
-# --- 3. PAINEL & GRIDS ---
+# --- 2. PAINEL & GRIDS ---
 elif menu == "📊 Painel & Grids":
     st.header("📊 Retrospectiva 2026")
     def draw_grid(title, metric, color):
@@ -204,27 +176,32 @@ elif menu == "📊 Painel & Grids":
     for i, l in enumerate(LINGUAGENS_LISTA):
         draw_grid(f"Frequência: {l}", l, cols_ling[i])
 
+# --- 3. CENTRAL DE ACORDOS ---
+elif menu == "🤝 Central de Acordos":
+    st.header("🤝 Gestão de Acordos")
+    with st.form("novo_ac"):
+        t = st.text_input("Descrição do Acordo:")
+        c = st.text_input("Nome Curto (Checklist):")
+        m = st.checkbox("Monitorar diariamente no Diário?")
+        if st.form_submit_button("Firmar Acordo"):
+            db["acordos_mestres"].append({"titulo": t, "nome_curto": c, "monitorar": m, "data": str(date.today())})
+            save_all(db)
+            st.rerun()
+    for i, ac in enumerate(db["acordos_mestres"]):
+        st.write(f"- **{ac['nome_curto']}**: {ac['titulo']}")
+        if st.button("Remover", key=f"del_{i}"):
+            db["acordos_mestres"].pop(i)
+            save_all(db); st.rerun()
+
 # --- 4. CÁPSULA DO TEMPO ---
 elif menu == "⏳ Cápsula do Tempo":
     st.header("⏳ Memórias")
     for d in [30, 90, 180]:
-        alvo_dt = (date.today() - timedelta(days=d))
-        alvo = alvo_dt.strftime("%Y-%m-%d")
+        alvo = (date.today() - timedelta(days=d)).strftime("%Y-%m-%d")
         if alvo in db["registros"]:
-            st.info(f"📅 Há {d} dias ({alvo_dt.strftime('%d/%m/%Y')}): {db['registros'][alvo].get('resumo')}")
+            st.info(f"📅 Há {d} dias ({alvo}): {db['registros'][alvo].get('resumo')}")
 
-# --- 5. EVENTOS ---
-elif menu == "📅 Eventos":
-    st.header("📅 Planejamento")
-    with st.form("ev"):
-        dt = st.date_input("Data:")
-        nome = st.text_input("Evento:")
-        if st.form_submit_button("Agendar"):
-            db["eventos"][dt.strftime("%Y-%m-%d")] = nome
-            save_all(db)
-            st.success("Agendado!")
-
-# --- 6. CONFIGURAÇÕES ---
+# --- 5. CONFIGURAÇÕES ---
 elif menu == "⚙️ Configurações":
     st.header("⚙️ Gestão de Opções")
     c1, c2 = st.columns(2)
@@ -234,22 +211,45 @@ elif menu == "⚙️ Configurações":
         for o in opcoes_eu:
             if not st.checkbox(o, value=True, key=f"e_{o}"):
                 db["configuracoes"]["opcoes_eu_fiz"].remove(o)
-                save_all(db)
-                st.rerun()
+                save_all(db); st.rerun()
     with c2:
         st.subheader("Opções: Ela Fez")
         opcoes_ela = list(db["configuracoes"]["opcoes_ela_fez"])
         for o in opcoes_ela:
             if not st.checkbox(o, value=True, key=f"k_{o}"):
                 db["configuracoes"]["opcoes_ela_fez"].remove(o)
-                save_all(db)
-                st.rerun()
+                save_all(db); st.rerun()
 
-# --- 7. IA INSIGHTS ---
+# --- 6. IA INSIGHTS (CORREÇÃO DE ERRO) ---
 elif menu == "💡 Insights da IA":
     st.header("💡 Análise do Especialista")
     if st.button("Gerar Insights"):
-        recent = str(list(db["registros"].items())[-7:])
-        prompt = f"Analise o relacionamento de Jhonata e Katheryn com base nisso: {recent}. Foque em Linguagens do Amor e Acordos."
-        resp = client_groq.chat.completions.create(model="llama3-70b-8192", messages=[{"role":"user","content":prompt}])
-        st.write(resp.choices[0].message.content)
+        # Limita o histórico para não sobrecarregar o prompt e evitar BadRequestError
+        registros_recentes = list(db["registros"].items())[-5:]
+        contexto_texto = ""
+        for data_r, info in registros_recentes:
+            contexto_texto += f"\nData: {data_r} | Nota: {info.get('nota')} | Resumo: {info.get('resumo')[:100]}"
+        
+        if not contexto_texto:
+            st.warning("Adicione alguns registros primeiro!")
+        else:
+            prompt = f"Como terapeuta de casais, analise este histórico breve de Jhonata e Katheryn e dê uma dica prática: {contexto_texto}"
+            try:
+                resp = client_groq.chat.completions.create(
+                    model="llama3-70b-8192", 
+                    messages=[{"role":"user","content":prompt}],
+                    max_tokens=300
+                )
+                st.info(resp.choices[0].message.content)
+            except Exception as e:
+                st.error(f"Erro na API do Groq: {e}")
+
+# --- 7. EVENTOS ---
+elif menu == "📅 Eventos":
+    st.header("📅 Planejamento")
+    with st.form("ev"):
+        dt = st.date_input("Data:")
+        nome = st.text_input("Evento:")
+        if st.form_submit_button("Agendar"):
+            db["eventos"][dt.strftime("%Y-%m-%d")] = nome
+            save_all(db); st.rerun()
