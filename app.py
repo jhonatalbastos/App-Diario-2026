@@ -7,14 +7,14 @@ from github import Github, Auth
 from groq import Groq
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="Love Planner 4.5", layout="wide", page_icon="❤️")
+st.set_page_config(page_title="Love Planner 4.6 - Jhonata & Katheryn", layout="wide", page_icon="❤️")
 
 # --- SEGURANÇA (SECRETS) ---
 try:
     GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
     GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
     GITHUB_REPO = st.secrets["GITHUB_REPO"]
-except:
+except Exception:
     st.error("Erro nos Secrets. Verifique o painel do Streamlit Cloud.")
     st.stop()
 
@@ -26,18 +26,27 @@ repo = g.get_repo(GITHUB_REPO)
 
 # --- CONSTANTES ---
 LINGUAGENS_LISTA = ["Atos de Serviço", "Palavras de Afirmação", "Tempo de Qualidade", "Toque Físico", "Presentes"]
-MODELO_GROQ = "llama-3.3-70b-specdec" # Atualizado para o modelo atual
+MODELO_GROQ = "llama-3.3-70b-versatile" # Modelo atualizado e estável
 
 # --- FUNÇÕES DE DADOS ---
 def load_data():
     try:
         contents = repo.get_contents("data_2026.json")
         data = json.loads(contents.decoded_content.decode())
+        if "registros" not in data: data["registros"] = {}
+        if "eventos" not in data: data["eventos"] = {}
+        if "acordos_mestres" not in data: data["acordos_mestres"] = []
+        if "metas" not in data: data["metas"] = {"elogios": 3, "qualidade": 2}
+        if "configuracoes" not in data:
+            data["configuracoes"] = {
+                "opcoes_eu_fiz": ["Elogio", "Tempo de Qualidade", "Ajuda"],
+                "opcoes_ela_fez": ["Carinho", "Apoio"]
+            }
         return data
     except:
         return {"registros": {}, "eventos": {}, "acordos_mestres": [], 
                 "metas": {"elogios": 3, "qualidade": 2},
-                "configuracoes": {"opcoes_eu_fiz": ["Elogio", "Tempo de Qualidade"], "opcoes_ela_fez": ["Carinho"]}}
+                "configuracoes": {"opcoes_eu_fiz": ["Elogio"], "opcoes_ela_fez": ["Carinho"]}}
 
 def save_all(data):
     json_data = json.dumps(data, indent=4, ensure_ascii=False)
@@ -50,10 +59,10 @@ def save_all(data):
 db = load_data()
 
 # --- NAVEGAÇÃO LATERAL ---
-st.sidebar.title("❤️ Love Planner 4.5")
+st.sidebar.title("❤️ Love Planner 4.6")
 menu = st.sidebar.radio("Navegação:", ["📝 Diário", "🤝 Central de Acordos", "📊 Painel & Grids", "⏳ Cápsula do Tempo", "📅 Eventos", "⚙️ Configurações", "💡 Insights da IA"])
 
-# --- 1. DIÁRIO ---
+# --- 1. ABA DIÁRIO ---
 if menu == "📝 Diário":
     st.header("📝 Registro Diário")
     selected_date = st.date_input("Data do Registro:", date.today())
@@ -62,13 +71,13 @@ if menu == "📝 Diário":
     is_locked = day_data.get("locked", False)
 
     if is_locked:
-        st.warning("🔒 Dia trancado.")
-        if st.button("🔓 Destrancar"):
+        st.warning(f"🔒 Registro de {selected_date.strftime('%d/%m/%Y')} trancado.")
+        if st.button("🔓 Destrancar para Editar"):
             db["registros"][date_str]["locked"] = False
             save_all(db); st.rerun()
 
-    with st.form("form_v45"):
-        nota = st.select_slider("Nota do Dia:", options=range(1,11), value=day_data.get("nota", 7), disabled=is_locked)
+    with st.form("form_v46"):
+        nota = st.select_slider("Nota do Relacionamento (1-10):", options=range(1,11), value=day_data.get("nota", 7), disabled=is_locked)
         
         # Acordos Ativos
         acordos_ativos = [a for a in db.get("acordos_mestres", []) if a.get("monitorar")]
@@ -85,30 +94,28 @@ if menu == "📝 Diário":
             st.subheader("Jhonata")
             op_eu = db["configuracoes"]["opcoes_eu_fiz"] + ["Outro"]
             eu_fiz = st.multiselect("Eu fiz:", op_eu, [x for x in day_data.get("eu_fiz", []) if x in op_eu], disabled=is_locked)
-            novo_eu = st.text_input("Novo (Eu):") if "Outro" in eu_fiz else ""
+            novo_eu = st.text_input("Novo (Eu):", key="n_eu") if "Outro" in eu_fiz else ""
             ling_eu = st.multiselect("Minhas Linguagens:", LINGUAGENS_LISTA, day_data.get("ling_eu", []), disabled=is_locked)
             disc = st.checkbox("Houve discussão?", day_data.get("discussao", False), disabled=is_locked)
         with col2:
             st.subheader("Katheryn")
             op_ela = db["configuracoes"]["opcoes_ela_fez"] + ["Outro"]
             ela_fez = st.multiselect("Ela fez:", op_ela, [x for x in day_data.get("ela_fez", []) if x in op_ela], disabled=is_locked)
-            novo_ela = st.text_input("Novo (Ela):") if "Outro" in ela_fez else ""
+            novo_ela = st.text_input("Novo (Ela):", key="n_ela") if "Outro" in ela_fez else ""
             ling_ela = st.multiselect("Linguagens dela:", LINGUAGENS_LISTA, day_data.get("ling_ela", []), disabled=is_locked)
             sexo = st.radio("Houve sexo?", ["Sim", "Não"], index=0 if day_data.get("sexo", True) else 1, disabled=is_locked)
 
         st.divider()
-        with st.expander("💬 WhatsApp e Resumo"):
-            ws_raw = st.text_area("Importar conversa do WhatsApp:")
-            # Visualização formatada se já houver conversa salva
+        with st.expander("💬 Importar WhatsApp"):
+            ws_raw = st.text_area("Cole a conversa exportada aqui (apenas hoje será filtrado).")
             if day_data.get("whatsapp_txt"):
-                st.write("---")
-                for line in day_data["whatsapp_txt"].split('\n'):
-                    if ":" in line:
-                        st.markdown(f"> {line}")
+                st.markdown("### Mensagens Salvas:")
+                st.code(day_data["whatsapp_txt"])
         
         resumo = st.text_area("Resumo do dia:", day_data.get("resumo", ""), disabled=is_locked)
-        
-        if st.form_submit_button("💾 Salvar e Trancar") and not is_locked:
+        btn_salvar = st.form_submit_button("💾 Salvar e Trancar")
+
+        if btn_salvar and not is_locked:
             f_eu = [i for i in eu_fiz if i != "Outro"]
             if novo_eu and novo_eu not in db["configuracoes"]["opcoes_eu_fiz"]:
                 db["configuracoes"]["opcoes_eu_fiz"].append(novo_eu)
@@ -134,9 +141,9 @@ if menu == "📝 Diário":
 
 # --- 2. PAINEL & GRIDS ---
 elif menu == "📊 Painel & Grids":
-    st.header("📊 Retrospectiva Visual")
+    st.header("📊 Retrospectiva & Metas")
     
-    # Metas Semanais
+    # Cálculo Metas Semanais
     hoje = date.today()
     inicio_sem = hoje - timedelta(days=hoje.weekday())
     reg_semana = [db["registros"].get((inicio_sem + timedelta(days=i)).strftime("%Y-%m-%d"), {}) for i in range(7)]
@@ -165,11 +172,11 @@ elif menu == "📊 Painel & Grids":
             grid += f'<div title="{ds}" style="width: 12px; height: 12px; background-color: {c}; border-radius: 2px;"></div>'
         st.markdown(grid + '</div>', unsafe_allow_html=True)
 
-    draw_grid("⭐ Notas", "nota", "")
+    draw_grid("⭐ Notas (Semáforo)", "nota", "")
     draw_grid("🔥 Sexo", "sexo", "#e91e63")
     draw_grid("⚠️ Discussões", "discussao", "#f44336")
 
-# --- 3. INSIGHTS IA (MODELO ATUALIZADO) ---
+# --- 3. INSIGHTS IA ---
 elif menu == "💡 Insights da IA":
     st.header("💡 Análise do Especialista")
     if st.button("Gerar Insights"):
@@ -181,7 +188,7 @@ elif menu == "💡 Insights da IA":
         if not ctx:
             st.warning("Adicione registros primeiro!")
         else:
-            prompt = f"Como terapeuta de casais, analise o relacionamento de Jhonata e Katheryn: {ctx}"
+            prompt = f"Como terapeuta de casais, analise o relacionamento de Jhonata e Katheryn com base nisso: {ctx}"
             try:
                 resp = client_groq.chat.completions.create(
                     model=MODELO_GROQ, 
@@ -192,17 +199,17 @@ elif menu == "💡 Insights da IA":
             except Exception as e:
                 st.error(f"Erro na API: {e}")
 
-# --- DEMAIS ABAS (Central de Acordos, Configs, Eventos) ---
+# --- DEMAIS ABAS ---
 elif menu == "🤝 Central de Acordos":
     st.header("🤝 Acordos")
-    with st.form("novo_ac"):
-        t = st.text_input("Acordo:"); c = st.text_input("Nome Curto:"); m = st.checkbox("Monitorar diariamente?")
+    with st.form("a_m"):
+        t = st.text_input("Acordo:"); c = st.text_input("Nome Curto:"); m = st.checkbox("Monitorar?")
         if st.form_submit_button("Firmar"):
             db["acordos_mestres"].append({"titulo":t, "nome_curto":c, "monitorar":m, "data":str(date.today())})
             save_all(db); st.rerun()
     for i, ac in enumerate(db["acordos_mestres"]):
         st.write(f"- {ac['nome_curto']}: {ac['titulo']}")
-        if st.button("Excluir", key=f"del_{i}"): db["acordos_mestres"].pop(i); save_all(db); st.rerun()
+        if st.button("Excluir", key=f"d_a_{i}"): db["acordos_mestres"].pop(i); save_all(db); st.rerun()
 
 elif menu == "⚙️ Configurações":
     st.header("⚙️ Configs")
@@ -227,6 +234,6 @@ elif menu == "⏳ Cápsula do Tempo":
 
 elif menu == "📅 Eventos":
     st.header("📅 Calendário")
-    with st.form("ev"):
+    with st.form("e"):
         dt = st.date_input("Data:"); n = st.text_input("Evento:")
         if st.form_submit_button("Agendar"): db["eventos"][dt.strftime("%Y-%m-%d")] = n; save_all(db); st.rerun()
