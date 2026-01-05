@@ -7,9 +7,10 @@ from github import Github, Auth
 from groq import Groq
 from fpdf import FPDF
 import io
+from PIL import Image # Importar Pillow para manipulação de imagem
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="Love Planner 4.8 - Jhonata & Katheryn", layout="wide", page_icon="❤️")
+st.set_page_config(page_title="Love Planner 4.9 - Jhonata & Katheryn", layout="wide", page_icon="❤️")
 
 # --- SEGURANÇA (SECRETS) ---
 try:
@@ -54,12 +55,51 @@ def save_all(data):
 
 db = load_data()
 
-# --- FUNÇÃO EXPORTAR PDF ---
-def gerar_pdf(dados_mes, nome_mes):
+# --- FUNÇÃO EXPORTAR PDF COM CAPA ---
+def gerar_pdf_com_capa(dados_mes, nome_mes, imagem_bytes=None):
     pdf = FPDF()
+
+    # Adicionar a Capa
     pdf.add_page()
+    if imagem_bytes:
+        try:
+            # Tenta abrir a imagem e redimensionar se for muito grande
+            img = Image.open(io.BytesIO(imagem_bytes))
+            
+            # Manter proporção e ajustar à página
+            max_width = 180 # Largura máxima na página
+            max_height = 250 # Altura máxima na página
+
+            img_width, img_height = img.size
+            aspect_ratio = img_width / img_height
+
+            if img_width > max_width:
+                img_width = max_width
+                img_height = img_width / aspect_ratio
+            if img_height > max_height:
+                img_height = max_height
+                img_width = img_height * aspect_ratio
+
+            # Centralizar imagem
+            x = (210 - img_width) / 2
+            y = (297 - img_height) / 2 - 20 # Ajuste para título
+            
+            pdf.image(io.BytesIO(imagem_bytes), x=x, y=y, w=img_width, h=img_height)
+        except Exception as e:
+            st.warning(f"Não foi possível processar a imagem. Erro: {e}")
+            # Se der erro, continua sem a imagem mas com título
+    
+    pdf.set_font("Arial", "B", 24)
+    pdf.set_text_color(255, 0, 0) # Cor vermelha
+    pdf.text(70, 30, f"Nossas Memórias de {nome_mes}")
+    pdf.set_text_color(0, 0, 0) # Volta ao preto
+    pdf.set_font("Arial", "I", 14)
+    pdf.text(80, 40, "Jhonata & Katheryn - 2026")
+    pdf.add_page() # Nova página para o conteúdo
+
+    # Conteúdo do Diário
     pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, f"Memórias de {nome_mes} - 2026", ln=True, align='C')
+    pdf.cell(0, 10, f"Detalhes do Mês de {nome_mes}", ln=True, align='C')
     pdf.ln(10)
     
     for data, info in sorted(dados_mes.items()):
@@ -68,12 +108,19 @@ def gerar_pdf(dados_mes, nome_mes):
         pdf.set_font("Arial", "", 10)
         resumo = info.get('resumo', 'Sem resumo registrado.')
         pdf.multi_cell(0, 5, f"Resumo: {resumo}")
+        
+        # Adiciona detalhes do WhatsApp se existirem
+        if info.get('whatsapp_txt'):
+            pdf.set_font("Arial", "I", 8)
+            pdf.multi_cell(0, 4, f"WhatsApp: {info['whatsapp_txt'][:200]}...") # Limita para não sobrecarregar
+            pdf.ln(2)
+        
         pdf.ln(5)
     
     return pdf.output()
 
 # --- NAVEGAÇÃO ---
-st.sidebar.title("❤️ Love Planner 4.8")
+st.sidebar.title("❤️ Love Planner 4.9")
 menu = st.sidebar.radio("Navegação:", ["📝 Diário", "📊 Painel & Grids", "🤝 Acordos", "⏳ Cápsula do Tempo", "📅 Eventos", "💡 Insights da IA", "⚙️ Configurações"])
 
 # --- 1. ABA DIÁRIO ---
@@ -90,7 +137,7 @@ if menu == "📝 Diário":
             db["registros"][date_str]["locked"] = False
             save_all(db); st.rerun()
 
-    with st.form("form_v48"):
+    with st.form("form_v49"):
         nota = st.select_slider("Nota do Relacionamento:", options=range(1,11), value=day_data.get("nota", 7), disabled=is_locked)
         
         acordos_ativos = [a for a in db.get("acordos_mestres", []) if a.get("monitorar")]
@@ -143,22 +190,28 @@ if menu == "📝 Diário":
             }
             save_all(db); st.rerun()
 
-# --- 2. PAINEL & GRIDS ---
+# --- 2. PAINEL & GRIDS (COM UPLOAD DE FOTO) ---
 elif menu == "📊 Painel & Grids":
     st.header("📊 Retrospectiva & Exportação")
     
-    # Exportação PDF
-    st.subheader("📥 Exportar Diário")
+    # Exportação PDF com Capa
+    st.subheader("📥 Exportar Diário para PDF")
     meses_dict = {"01": "Janeiro", "02": "Fevereiro", "03": "Março", "04": "Abril", "05": "Maio", "06": "Junho", 
                   "07": "Julho", "08": "Agosto", "09": "Setembro", "10": "Outubro", "11": "Novembro", "12": "Dezembro"}
-    mes_sel = st.selectbox("Selecione o mês para exportar:", list(meses_dict.values()))
+    mes_sel = st.selectbox("Selecione o mês para exportar:", list(meses_dict.values()), key="sel_mes_pdf")
     cod_mes = [k for k, v in meses_dict.items() if v == mes_sel][0]
+
+    uploaded_file = st.file_uploader("Escolha uma imagem para a capa (opcional):", type=["jpg", "jpeg", "png"])
+    imagem_capa_bytes = None
+    if uploaded_file is not None:
+        imagem_capa_bytes = uploaded_file.read()
+        st.image(uploaded_file, caption='Sua imagem de capa', width=200)
     
-    if st.button("Gerar PDF do Mês"):
+    if st.button("Gerar PDF do Mês com Capa"):
         dados_mes = {k: v for k, v in db["registros"].items() if k.split("-")[1] == cod_mes}
         if dados_mes:
-            pdf_bytes = gerar_pdf(dados_mes, mes_sel)
-            st.download_button(label="⬇️ Baixar PDF", data=pdf_bytes, file_name=f"Memorias_{mes_sel}_2026.pdf", mime="application/pdf")
+            pdf_bytes_output = gerar_pdf_com_capa(dados_mes, mes_sel, imagem_capa_bytes)
+            st.download_button(label="⬇️ Baixar PDF com Capa", data=pdf_bytes_output, file_name=f"Memorias_{mes_sel}_2026.pdf", mime="application/pdf")
         else:
             st.warning("Nenhum registro encontrado para este mês.")
 
@@ -184,7 +237,7 @@ elif menu == "📊 Painel & Grids":
     draw_grid("🔥 Sexo", "sexo", "#e91e63")
     draw_grid("⚠️ Discussões", "discussao", "#f44336")
 
-# --- DEMAIS ABAS (Centralizados para economizar espaço) ---
+# --- DEMAIS ABAS ---
 elif menu == "🤝 Acordos":
     st.header("🤝 Central de Acordos")
     with st.form("ac"):
