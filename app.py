@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import io
+import altair as alt
 from datetime import datetime, date, timedelta
 from github import Github, Auth
 from groq import Groq
@@ -9,7 +10,92 @@ from fpdf import FPDF
 from PIL import Image
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="Love Planner 4.13 - Full Edition", layout="wide", page_icon="❤️")
+st.set_page_config(page_title="Love Planner 2026", layout="centered", page_icon="❤️")
+
+# --- ESTILIZAÇÃO CSS (O SEGREDO DO VISUAL) ---
+st.markdown("""
+<style>
+    /* Importando Fonte do HTML original */
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap');
+
+    /* Variáveis de Cores */
+    :root {
+        --primary: #f42536;
+        --primary-soft: #ffe5e7;
+        --bg-light: #fcf8f8;
+        --card-bg: #ffffff;
+        --text-main: #1c0d0e;
+        --shadow: 0 4px 20px -2px rgba(244, 37, 54, 0.08);
+    }
+
+    /* Aplicando Fonte e Fundo */
+    html, body, [class*="css"] {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .stApp {
+        background-color: var(--bg-light);
+    }
+
+    /* Estilo dos Cards (Container) */
+    .css-card {
+        background-color: var(--card-bg);
+        border-radius: 24px;
+        padding: 24px;
+        box-shadow: var(--shadow);
+        border: 1px solid #e8ced1;
+        margin-bottom: 20px;
+    }
+
+    /* Botões Personalizados */
+    div.stButton > button {
+        background-color: var(--primary);
+        color: white;
+        border-radius: 12px;
+        border: none;
+        padding: 12px 24px;
+        font-weight: 700;
+        width: 100%;
+        transition: all 0.2s;
+    }
+    div.stButton > button:hover {
+        background-color: #d11a2a;
+        transform: scale(1.02);
+        color: white;
+    }
+    
+    /* Botão Secundário (Outline) */
+    div.stButton > button.secondary {
+        background-color: transparent;
+        border: 2px solid var(--primary);
+        color: var(--primary);
+    }
+
+    /* Inputs e Sliders */
+    .stSlider [data-baseweb="slider"] {
+        color: var(--primary);
+    }
+    
+    /* Cabeçalhos */
+    h1, h2, h3 {
+        color: var(--text-main);
+        font-weight: 800;
+    }
+    
+    /* Custom XP Card Style */
+    .xp-card {
+        background: linear-gradient(135deg, #f42536 0%, #ff5c6a 100%);
+        color: white;
+        border-radius: 24px;
+        padding: 20px;
+        text-align: center;
+        box-shadow: 0 10px 25px -5px rgba(244, 37, 54, 0.4);
+        margin-bottom: 20px;
+    }
+    .xp-stat { font-size: 3rem; font-weight: 800; line-height: 1; }
+    .xp-label { font-size: 0.9rem; opacity: 0.9; font-weight: 500; }
+    
+</style>
+""", unsafe_allow_html=True)
 
 # --- SEGURANÇA (SECRETS) ---
 try:
@@ -17,20 +103,19 @@ try:
     GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
     GITHUB_REPO = st.secrets["GITHUB_REPO"]
 except Exception:
-    st.error("Erro nos Secrets. Verifique o painel do Streamlit Cloud.")
+    st.error("Erro nos Secrets.")
     st.stop()
 
-# Inicialização de APIs
+# APIs
 client_groq = Groq(api_key=GROQ_API_KEY)
 auth = Auth.Token(GITHUB_TOKEN)
 g = Github(auth=auth)
 repo = g.get_repo(GITHUB_REPO)
 
-# --- CONSTANTES ---
+# --- DADOS ---
 LINGUAGENS_LISTA = ["Atos de Serviço", "Palavras de Afirmação", "Tempo de Qualidade", "Toque Físico", "Presentes"]
-CATEGORIAS_DR = ["Comunicação", "Finanças", "Tempo Juntos", "Ciúmes/Insegurança", "Família", "Tarefas Domésticas", "Outros"]
+CATEGORIAS_DR = ["Comunicação", "Finanças", "Ciúmes", "Família", "Rotina", "Outros"]
 
-# --- FUNÇÕES DE DADOS ---
 def load_data():
     try:
         contents = repo.get_contents("data_2026.json")
@@ -40,18 +125,10 @@ def load_data():
         if "acordos_mestres" not in data: data["acordos_mestres"] = []
         if "metas" not in data: data["metas"] = {"elogios": 3, "qualidade": 2}
         if "configuracoes" not in data:
-            data["configuracoes"] = {
-                "opcoes_eu_fiz": ["Elogio", "Tempo de Qualidade", "Ajuda", "Cozinhar"],
-                "opcoes_ela_fez": ["Carinho", "Apoio", "Cuidado"]
-            }
+             data["configuracoes"] = {"opcoes_eu_fiz": ["Elogio", "Tempo de Qualidade"], "opcoes_ela_fez": ["Carinho"]}
         return data
     except:
-        return {
-            "registros": {}, "eventos": {}, "acordos_mestres": [], "xp": 0,
-            "metas": {"elogios": 3, "qualidade": 2},
-            "configuracoes": {"opcoes_eu_fiz": ["Elogio"], "opcoes_ela_fez": ["Carinho"]},
-            "config": {"modelo_ia": "llama-3.3-70b-versatile"}
-        }
+        return {"registros": {}, "eventos": {}, "acordos_mestres": [], "xp": 0, "metas": {"elogios": 3, "qualidade": 2}, "configuracoes": {"opcoes_eu_fiz": ["Elogio"], "opcoes_ela_fez": ["Carinho"]}, "config": {"modelo_ia": "llama-3.3-70b-versatile"}}
 
 def save_all(data):
     json_data = json.dumps(data, indent=4, ensure_ascii=False)
@@ -63,191 +140,241 @@ def save_all(data):
 
 db = load_data()
 
-# --- GAMIFICAÇÃO ---
+# --- HELPER GAMIFICAÇÃO ---
 def get_nivel_info(xp):
     nivel = int((xp / 100) ** 0.5) + 1
-    progresso = (xp % 100) / 100
-    return nivel, progresso
+    prox_nivel_xp = ((nivel) ** 2) * 100
+    return nivel, prox_nivel_xp
 
-# --- FUNÇÃO EXPORTAR PDF ---
-def gerar_pdf_com_capa(dados_mes, nome_mes, imagem_bytes=None):
+# --- HELPER PDF ---
+def gerar_pdf(dados_mes, nome_mes):
     pdf = FPDF()
     pdf.add_page()
-    if imagem_bytes:
-        try:
-            img_io = io.BytesIO(imagem_bytes)
-            pdf.image(img_io, x=15, y=60, w=180)
-        except: pass
-    pdf.set_font("Helvetica", "B", 24)
-    pdf.set_text_color(200, 0, 0)
-    pdf.text(60, 30, f"Memórias de {nome_mes}")
-    pdf.set_font("Helvetica", "I", 14)
-    pdf.text(75, 40, "Jhonata & Katheryn - 2026")
-    pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 10, f"Relatório Mensal", ln=True, align='C')
+    pdf.set_font("Arial", "B", 20)
+    pdf.set_text_color(244, 37, 54) # Cor primária
+    pdf.cell(0, 10, f"Planner {nome_mes}", ln=True, align='C')
     pdf.ln(10)
     for d, i in sorted(dados_mes.items()):
-        pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(0, 8, f"Data: {d} | Nota: {i.get('nota')}", ln=True)
-        pdf.set_font("Helvetica", "", 10)
-        pdf.multi_cell(0, 5, f"Resumo: {i.get('resumo', '')}")
-        if i.get('gratidao'):
-            pdf.set_font("Helvetica", "I", 10); pdf.set_text_color(100, 100, 100)
-            pdf.multi_cell(0, 5, f"Gratidão: {i['gratidao']}")
-            pdf.set_text_color(0, 0, 0)
-        pdf.ln(4)
+        pdf.set_font("Arial", "B", 12)
+        pdf.set_text_color(0, 0, 0)
+        pdf.cell(0, 8, f"{d} | Nota: {i.get('nota')}", ln=True)
+        pdf.set_font("Arial", "", 10)
+        pdf.multi_cell(0, 5, i.get('resumo', ''))
+        pdf.ln(5)
     return bytes(pdf.output())
 
-# --- BARRA LATERAL ---
-nivel, prog = get_nivel_info(db["xp"])
-st.sidebar.title(f"❤️ Love Planner 4.13")
-st.sidebar.subheader(f"Nível de Conexão: {nivel}")
-st.sidebar.progress(prog)
+# --- NAVEGAÇÃO ---
+# Simular a Bottom Nav do HTML com o menu lateral, mas estilizado
+st.sidebar.markdown("### ❤️ Menu")
+menu = st.sidebar.radio("", ["Dashboard", "Registrar Dia", "Metas & Acordos", "Cápsula", "Insights IA", "Configurações"])
 
-menu = st.sidebar.radio("Navegação:", ["📝 Diário", "📊 Painel & Grids", "🤝 Acordos", "⏳ Cápsula do Tempo", "📅 Eventos", "💡 Insights IA", "⚙️ Configurações"])
+# --- HEADER DE GAMIFICAÇÃO (SEMPRE VISÍVEL NO TOPO DO DASH) ---
+nivel, meta_xp = get_nivel_info(db["xp"])
+if menu == "Dashboard":
+    st.markdown(f"""
+    <div class="xp-card">
+        <div class="xp-label">NÍVEL DE CONEXÃO</div>
+        <div class="xp-stat">{nivel}</div>
+        <div style="background: rgba(255,255,255,0.3); height: 6px; border-radius: 3px; margin-top: 10px; overflow: hidden;">
+            <div style="background: white; width: {(db['xp']/meta_xp)*100}%; height: 100%;"></div>
+        </div>
+        <div style="font-size: 0.8rem; margin-top: 5px; opacity: 0.8;">{db['xp']} / {meta_xp} XP</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-# --- 1. DIÁRIO ---
-if menu == "📝 Diário":
-    st.header("📝 Registro Diário")
+# --- 1. DASHBOARD ---
+if menu == "Dashboard":
+    # Container estilo Card
+    with st.container():
+        st.markdown('<div class="css-card">', unsafe_allow_html=True)
+        st.markdown("### 📈 Humor da Semana")
+        
+        # Gráfico Altair (Estilo Chart.js suave do HTML)
+        df_notas = pd.DataFrame([
+            {"Data": datetime.strptime(k, "%Y-%m-%d"), "Nota": v["nota"]} 
+            for k, v in db["registros"].items() if "nota" in v
+        ]).sort_values("Data")
+        
+        if not df_notas.empty:
+            chart = alt.Chart(df_notas).mark_line(
+                interpolate='monotone', 
+                color='#f42536',
+                strokeWidth=3
+            ).encode(
+                x=alt.X('Data', axis=alt.Axis(format='%d/%m')),
+                y=alt.Y('Nota', scale=alt.Scale(domain=[0, 10])),
+                tooltip=['Data', 'Nota']
+            ).properties(height=200)
+            st.altair_chart(chart, use_container_width=True)
+        else:
+            st.info("Registre seu primeiro dia para ver o gráfico!")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Cards de Resumo Recente
+    st.markdown("### 📅 Histórico Recente")
+    recentes = sorted(list(db["registros"].items()), reverse=True)[:3]
+    for d, i in recentes:
+        cor_nota = "#22c55e" if i['nota'] >= 8 else "#eab308" if i['nota'] >= 5 else "#ef4444"
+        st.markdown(f"""
+        <div class="css-card" style="padding: 15px; display: flex; align-items: center; gap: 15px; margin-bottom: 10px;">
+            <div style="background-color: {cor_nota}; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+                {i['nota']}
+            </div>
+            <div>
+                <div style="font-weight: bold; font-size: 0.9rem;">{datetime.strptime(d, "%Y-%m-%d").strftime("%d/%m")}</div>
+                <div style="font-size: 0.8rem; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;">
+                    {i.get('resumo', 'Sem resumo')}
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# --- 2. REGISTRAR DIA ---
+elif menu == "Registrar Dia":
+    st.markdown("## 📝 Registrar Dia")
+    
+    # Card Principal
+    st.markdown('<div class="css-card">', unsafe_allow_html=True)
+    
     selected_date = st.date_input("Data:", date.today())
     date_str = selected_date.strftime("%Y-%m-%d")
     day_data = db["registros"].get(date_str, {})
-    is_locked = day_data.get("locked", False)
-
-    if is_locked:
-        st.warning("🔒 Trancado.")
-        if st.button("🔓 Destrancar"):
+    
+    if day_data.get("locked"):
+        st.warning("🔒 Dia registrado!")
+        if st.button("🔓 Editar"):
             db["registros"][date_str]["locked"] = False
             save_all(db); st.rerun()
+    else:
+        with st.form("form_registro"):
+            st.subheader("Como foi hoje?")
+            nota = st.slider("", 1, 10, value=day_data.get("nota", 8))
+            
+            st.write("---")
+            c1, c2 = st.columns(2)
+            with c1:
+                st.caption("O que rolou?")
+                # Mistura de tags eu/ela em uma visualização única se quiser, ou separado
+                eu_fiz = st.multiselect("Eu fiz:", db["configuracoes"]["opcoes_eu_fiz"], day_data.get("eu_fiz", []))
+                disc = st.checkbox("Teve DR?", day_data.get("discussao", False))
+                if disc: cat_dr = st.selectbox("Motivo:", CATEGORIAS_DR)
+                else: cat_dr = None
+            with c2:
+                st.caption("Interações")
+                ela_fez = st.multiselect("Ela fez:", db["configuracoes"]["opcoes_ela_fez"], day_data.get("ela_fez", []))
+                sexo = st.radio("Intimidade:", ["Sim", "Não"], index=0 if day_data.get("sexo", True) else 1, horizontal=True)
 
-    with st.form("diario_v13"):
-        nota = st.select_slider("Nota do Relacionamento:", range(1,11), value=day_data.get("nota", 7), disabled=is_locked)
-        gratidao = st.text_input("Gratidão do dia:", value=day_data.get("gratidao", ""), disabled=is_locked)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            eu_fiz = st.multiselect("Eu fiz:", db["configuracoes"]["opcoes_eu_fiz"], day_data.get("eu_fiz", []), disabled=is_locked)
-            ling_eu = st.multiselect("Minhas Linguagens:", LINGUAGENS_LISTA, day_data.get("ling_eu", []), disabled=is_locked)
-            disc = st.checkbox("Discussão?", day_data.get("discussao", False), disabled=is_locked)
-            cat_dr = st.selectbox("Motivo DR:", CATEGORIAS_DR, disabled=not disc or is_locked)
-        with col2:
-            ela_fez = st.multiselect("Ela fez:", db["configuracoes"]["opcoes_ela_fez"], day_data.get("ela_fez", []), disabled=is_locked)
-            ling_ela = st.multiselect("Linguagens dela:", LINGUAGENS_LISTA, day_data.get("ling_ela", []), disabled=is_locked)
-            sexo = st.radio("Sexo?", ["Sim", "Não"], index=0 if day_data.get("sexo", True) else 1, disabled=is_locked)
+            resumo = st.text_area("Diário de Bordo:", day_data.get("resumo", ""), height=100)
+            gratidao = st.text_input("Gratidão do dia:", day_data.get("gratidao", ""))
 
-        with st.expander("💬 WhatsApp"):
-            ws_raw = st.text_area("Importar conversa:")
-            if day_data.get("whatsapp_txt"): st.code(day_data["whatsapp_txt"])
-        
-        resumo = st.text_area("Resumo:", day_data.get("resumo", ""), disabled=is_locked)
-        
-        if st.form_submit_button("💾 Salvar") and not is_locked:
-            if date_str not in db["registros"]: db["xp"] += 20
-            if gratidao: db["xp"] += 5
-            ws_final = day_data.get("whatsapp_txt", "")
-            if ws_raw:
-                target = selected_date.strftime("%d/%m/%y")
-                ws_final = "\n".join([l for l in ws_raw.split('\n') if target in l])
-            db["registros"][date_str] = {
-                "nota": nota, "gratidao": gratidao, "eu_fiz": eu_fiz, "ela_fez": ela_fez,
-                "ling_eu": ling_eu, "ling_ela": ling_ela, "discussao": disc, "cat_dr": cat_dr if disc else None,
-                "sexo": sexo == "Sim", "resumo": resumo, "whatsapp_txt": ws_final, "locked": True
-            }
-            save_all(db); st.rerun()
-
-# --- 2. PAINEL & GRIDS (REINTEGRADO) ---
-elif menu == "📊 Painel & Grids":
-    st.header("📊 Painel de Controle")
+            if st.form_submit_button("Salvar Registro"):
+                xp_ganho = 0
+                if date_str not in db["registros"]: xp_ganho = 20
+                if gratidao: xp_ganho += 5
+                
+                db["xp"] += xp_ganho
+                db["registros"][date_str] = {
+                    "nota": nota, "gratidao": gratidao, "eu_fiz": eu_fiz, "ela_fez": ela_fez,
+                    "discussao": disc, "cat_dr": cat_dr, "sexo": sexo == "Sim", "resumo": resumo, "locked": True
+                }
+                save_all(db)
+                st.success(f"Salvo! +{xp_ganho} XP")
+                st.rerun()
     
-    # Metas Semanais
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# --- 3. METAS E ACORDOS ---
+elif menu == "Metas & Acordos":
+    st.markdown("## 🎯 Metas & Acordos")
+    
+    # Card de Metas
+    st.markdown('<div class="css-card">', unsafe_allow_html=True)
+    st.markdown("### Metas da Semana")
+    
     hoje = date.today()
     inicio_sem = hoje - timedelta(days=hoje.weekday())
     reg_semana = [db["registros"].get((inicio_sem + timedelta(days=i)).strftime("%Y-%m-%d"), {}) for i in range(7)]
-    c_elogios = sum(1 for r in reg_semana if "Elogio" in str(r.get("eu_fiz", [])))
-    c_qualidade = sum(1 for r in reg_semana if "Tempo de Qualidade" in str(r.get("eu_fiz", [])))
     
-    m1, m2 = st.columns(2)
-    m1.metric("Elogios (Semana)", f"{c_elogios}/{db['metas']['elogios']}")
-    m2.metric("Qualidade (Semana)", f"{c_qualidade}/{db['metas']['qualidade']}")
+    c_elogios = sum(1 for r in reg_semana if "Elogio" in str(r.get("eu_fiz", [])))
+    meta_elog = db['metas']['elogios']
+    
+    st.write(f"**Elogios** ({c_elogios}/{meta_elog})")
+    st.progress(min(c_elogios/meta_elog, 1.0))
+    
+    c_qual = sum(1 for r in reg_semana if "Tempo de Qualidade" in str(r.get("eu_fiz", [])))
+    meta_qual = db['metas']['qualidade']
+    st.write(f"**Tempo de Qualidade** ({c_qual}/{meta_qual})")
+    st.progress(min(c_qual/meta_qual, 1.0))
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # Exportação PDF
-    st.divider()
-    st.subheader("📥 Exportar Mês em PDF")
-    c_pdf1, c_pdf2 = st.columns(2)
-    with c_pdf1:
-        mes_sel = st.selectbox("Escolha o Mês:", ["01","02","03","04","05","06","07","08","09","10","11","12"])
-        up_img = st.file_uploader("Foto de Capa:", type=["png","jpg"])
-    with c_pdf2:
-        if st.button("Gerar PDF"):
-            dados_mes = {k: v for k, v in db["registros"].items() if k.split("-")[1] == mes_sel}
-            if dados_mes:
-                pdf_bytes = gerar_pdf_com_capa(dados_mes, mes_sel, up_img.read() if up_img else None)
-                st.download_button("Download PDF", pdf_bytes, f"Amor_{mes_sel}.pdf", "application/pdf")
+    # Card de Acordos
+    st.markdown('<div class="css-card">', unsafe_allow_html=True)
+    st.markdown("### Acordos Ativos")
+    
+    # Checkbox visual apenas para leitura ou form para editar
+    for ac in db["acordos_mestres"]:
+        status = "🟢" if ac.get('monitorar') else "⚪"
+        st.markdown(f"**{status} {ac['titulo']}**")
+        st.caption(f"Criado em: {ac['data']}")
+        st.divider()
+    
+    with st.expander("Gerenciar Acordos"):
+        with st.form("novo_acordo"):
+            t = st.text_input("Novo Acordo")
+            if st.form_submit_button("Adicionar"):
+                db["acordos_mestres"].append({"titulo": t, "nome_curto": t[:10], "monitorar": True, "data": str(date.today())})
+                save_all(db); st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # FUNÇÃO DE GRID
-    st.divider()
-    def draw_grid(title, metric, color):
-        st.write(f"#### {title}")
-        days = pd.date_range("2026-01-01", "2026-12-31")
-        grid = '<div style="display: flex; flex-wrap: wrap; gap: 3px; max-width: 900px; margin-bottom: 20px;">'
-        for d in days:
-            ds = d.strftime("%Y-%m-%d")
-            reg = db["registros"].get(ds, {})
-            c = "#ebedf0"
-            if ds in db["registros"]:
-                if metric == "nota":
-                    n = reg.get("nota", 0)
-                    c = "#216e39" if n >= 8 else "#f9d71c" if n >= 5 else "#f44336"
-                elif metric in LINGUAGENS_LISTA:
-                    c = color if metric in reg.get("ling_eu", []) or metric in reg.get("ling_ela", []) else "#ebedf0"
-                else: c = color if reg.get(metric) else "#ebedf0"
-            grid += f'<div title="{ds}" style="width: 12px; height: 12px; background-color: {c}; border-radius: 2px;"></div>'
-        st.markdown(grid + '</div>', unsafe_allow_html=True)
+# --- 4. CÁPSULA ---
+elif menu == "Cápsula":
+    st.markdown("## ⏳ Cápsula do Tempo")
+    st.markdown('<div class="css-card">', unsafe_allow_html=True)
+    st.info("O que aconteceu há um mês?")
+    alvo = (date.today() - timedelta(days=30)).strftime("%Y-%m-%d")
+    if alvo in db["registros"]:
+        r = db["registros"][alvo]
+        st.markdown(f"**Data:** {alvo} | **Nota:** {r['nota']}")
+        st.write(f"_{r.get('resumo', 'Sem resumo')}_")
+    else:
+        st.caption("Nenhum registro encontrado há exatos 30 dias.")
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Exportação PDF simples
+    if st.button("Baixar PDF deste Mês"):
+        mes_atual = date.today().strftime("%m")
+        dados_mes = {k: v for k, v in db["registros"].items() if k.split("-")[1] == mes_atual}
+        pdf_bytes = gerar_pdf(dados_mes, date.today().strftime("%B"))
+        st.download_button("Download", pdf_bytes, "memorias.pdf", "application/pdf")
 
-    draw_grid("⭐ Nota Geral", "nota", "")
-    draw_grid("🔥 Sexo", "sexo", "#e91e63")
-    draw_grid("⚠️ Discussões", "discussao", "#f44336")
-    st.subheader("🧬 Linguagens do Amor")
-    cols_ling = ["#ff5722", "#3f51b5", "#00bcd4", "#9c27b0", "#8bc34a"]
-    for i, l in enumerate(LINGUAGENS_LISTA): draw_grid(l, l, cols_ling[i])
-
-# --- DEMAIS ABAS ---
-elif menu == "🤝 Acordos":
-    st.header("🤝 Acordos")
-    with st.form("ac"):
-        t = st.text_input("Acordo:"); c = st.text_input("Nome Curto:"); m = st.checkbox("Monitorar?")
-        if st.form_submit_button("Firmar"):
-            db["acordos_mestres"].append({"titulo":t, "nome_curto":c, "monitorar":m, "data":str(date.today())})
+# --- 5. CONFIGURAÇÕES ---
+elif menu == "Configurações":
+    st.markdown("## ⚙️ Ajustes")
+    with st.container():
+        st.markdown('<div class="css-card">', unsafe_allow_html=True)
+        new_eu = st.text_input("Adicionar opção 'Eu fiz':")
+        if st.button("Adicionar Opção"):
+            db["configuracoes"]["opcoes_eu_fiz"].append(new_eu)
             save_all(db); st.rerun()
-    for i, ac in enumerate(db["acordos_mestres"]):
-        st.write(f"- {ac['nome_curto']}: {ac['titulo']}")
-        if st.button("Remover", key=f"d_{i}"): db["acordos_mestres"].pop(i); save_all(db); st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+    with st.container():
+         st.markdown('<div class="css-card">', unsafe_allow_html=True)
+         st.caption("Área Perigosa")
+         if st.button("Resetar Cache do App"):
+             st.cache_data.clear()
+         st.markdown('</div>', unsafe_allow_html=True)
 
-elif menu == "💡 Insights IA":
-    st.header("💡 Insights")
-    if st.button("Analisar"):
-        ctx = str(list(db["registros"].items())[-5:])
-        resp = client_groq.chat.completions.create(model=db["config"]["modelo_ia"], messages=[{"role":"user","content":f"Analise: {ctx}"}], max_tokens=800)
-        st.info(resp.choices[0].message.content)
-
-elif menu == "⚙️ Configurações":
-    st.header("⚙️ Configurações")
-    db["config"]["modelo_ia"] = st.text_input("Modelo Groq:", value=db["config"].get("modelo_ia"))
-    db["metas"]["elogios"] = st.number_input("Meta Elogios:", value=db["metas"]["elogios"])
-    db["metas"]["qualidade"] = st.number_input("Meta Qualidade:", value=db["metas"]["qualidade"])
-    if st.button("Salvar"): save_all(db); st.success("Salvo!")
-
-elif menu == "📅 Eventos":
-    st.header("📅 Calendário")
-    with st.form("ev"):
-        dt = st.date_input("Data:"); ev = st.text_input("Evento:")
-        if st.form_submit_button("Salvar"): db["eventos"][str(dt)] = ev; save_all(db); st.rerun()
-    for d, e in db["eventos"].items(): st.write(f"**{d}:** {e}")
-
-elif menu == "⏳ Cápsula do Tempo":
-    st.header("⏳ Memórias")
-    for d in [30, 90]:
-        alvo = (date.today() - timedelta(days=d)).strftime("%Y-%m-%d")
-        if alvo in db["registros"]: st.info(f"Há {d} dias: {db['registros'][alvo].get('resumo')}")
+# --- 6. INSIGHTS IA ---
+elif menu == "Insights IA":
+    st.header("💡 Mentor IA")
+    st.markdown('<div class="css-card">', unsafe_allow_html=True)
+    if st.button("Gerar Análise Semanal"):
+        ctx = str(list(db["registros"].items())[-7:])
+        try:
+            prompt = f"Aja como um mentor de relacionamento empático. Analise estes dados do casal (Jhonata e Katheryn): {ctx}. Dê 1 conselho curto e 1 elogio."
+            resp = client_groq.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role":"user","content":prompt}])
+            st.success(resp.choices[0].message.content)
+        except Exception as e:
+            st.error(f"Erro: {e}")
+    st.markdown('</div>', unsafe_allow_html=True)
