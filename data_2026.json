@@ -71,7 +71,7 @@
             "resumo": "",
             "whatsapp_txt": "",
             "checks_acordos": {},
-            "locked": true
+            "locked": false
         }
     },
     "eventos": {
