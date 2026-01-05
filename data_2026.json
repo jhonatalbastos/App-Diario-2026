@@ -22,7 +22,9 @@
             "locked": true
         }
     },
-    "eventos": {},
+    "eventos": {
+        "2026-04-22": "Aniversário de Katheryn"
+    },
     "acordos_mestres": [],
     "configuracoes": {
         "opcoes_eu_fiz": [
