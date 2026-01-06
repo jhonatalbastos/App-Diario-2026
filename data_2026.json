@@ -123,7 +123,7 @@
     "xp": 35,
     "config": {
         "modelo_ia": "llama-3.3-70b-versatile",
-        "tema": "Escuro"
+        "tema": "Claro"
     },
     "metas": {
         "elogios": 3,
