@@ -129,7 +129,7 @@
         "nomes_casal": "Jhonata & Katheryn",
         "foto_perfil": null,
         "notificacoes": true,
-        "dicas_mentor": false,
+        "dicas_mentor": true,
         "biometria": true
     },
     "metas": {
