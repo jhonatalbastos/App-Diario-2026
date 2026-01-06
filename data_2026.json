@@ -124,7 +124,8 @@
     "config": {
         "modelo_ia": "llama-3.3-70b-versatile",
         "tema": "Claro (Padrão)",
-        "home_page": "Registrar Dia"
+        "home_page": "Registrar Dia",
+        "data_inicio": "2022-04-22"
     },
     "metas": {
         "elogios": 3,
