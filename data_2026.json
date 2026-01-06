@@ -125,7 +125,12 @@
         "modelo_ia": "llama-3.3-70b-versatile",
         "tema": "Claro (Padrão)",
         "home_page": "Registrar Dia",
-        "data_inicio": "2022-04-02"
+        "data_inicio": "2022-04-02",
+        "nomes_casal": "Jhonata & Katheryn",
+        "foto_perfil": null,
+        "notificacoes": true,
+        "dicas_mentor": true,
+        "biometria": true
     },
     "metas": {
         "elogios": 3,
