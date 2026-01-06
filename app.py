@@ -69,31 +69,53 @@ def save_all(data):
 # Carregar dados
 db = load_data()
 
-# --- SISTEMA DE TEMAS AVANÇADO ---
+# --- SISTEMA DE TEMAS (ATUALIZADO COM CORES DO DESIGN HTML) ---
+# Extraído dos arquivos HTML/Tailwind enviados
 TEMAS = {
     "Claro (Padrão)": {
-        "primary": "#f42536", "bg_app": "#fcf8f8", "bg_sidebar": "#f0f2f6", 
-        "bg_card": "#ffffff", "text_main": "#1c0d0e", "border": "#e8ced1", "input_bg": "#ffffff"
+        "primary": "#f42536",       # Vermelho Love Planner
+        "primary_soft": "#ffe5e7",  # Rosa Suave
+        "bg_app": "#fcf8f8",        # Off-white quente (background-light)
+        "bg_sidebar": "#ffffff",    # Sidebar branca limpa
+        "bg_card": "#ffffff",       # Cartão branco
+        "text_main": "#1c0d0e",     # Texto quase preto (warm)
+        "text_muted": "#9c4950",    # Texto secundário avermelhado
+        "border": "transparent",    # Sem bordas duras (shadow only)
+        "input_bg": "#f8f5f6",      # Input levemente cinza/rosa
+        "shadow": "0 4px 20px -2px rgba(244, 37, 54, 0.08)" # Shadow Soft
     },
     "Escuro (Padrão)": {
-        "primary": "#f42536", "bg_app": "#0e1117", "bg_sidebar": "#262730", 
-        "bg_card": "#1e1e1e", "text_main": "#fafafa", "border": "#333333", "input_bg": "#2b2c35"
+        "primary": "#f42536",
+        "primary_soft": "#3f1d20",
+        "bg_app": "#221011",        # Dark Chocolate (background-dark)
+        "bg_sidebar": "#2f1b1c",    # Sidebar Dark
+        "bg_card": "#2d1517",       # Card Dark (surface-dark)
+        "text_main": "#fcf8f8",     # Texto claro
+        "text_muted": "#dcb8bb",    # Texto secundário claro
+        "border": "#4a2326",        # Borda sutil avermelhada
+        "input_bg": "#361b1d",      # Input dark
+        "shadow": "0 4px 20px -2px rgba(0, 0, 0, 0.3)"
     },
+    # Mantendo os outros temas como variações harmônicas
     "Romântico (Rosa)": {
-        "primary": "#db2777", "bg_app": "#fff1f2", "bg_sidebar": "#fce7f3", 
-        "bg_card": "#ffffff", "text_main": "#831843", "border": "#fbcfe8", "input_bg": "#fff0f5"
+        "primary": "#db2777", "primary_soft": "#fce7f3", "bg_app": "#fff1f2", "bg_sidebar": "#ffffff", 
+        "bg_card": "#ffffff", "text_main": "#831843", "text_muted": "#be185d", "border": "transparent", "input_bg": "#fff0f5",
+        "shadow": "0 4px 20px -2px rgba(219, 39, 119, 0.1)"
     },
     "Oceano (Azul)": {
-        "primary": "#0284c7", "bg_app": "#f0f9ff", "bg_sidebar": "#e0f2fe", 
-        "bg_card": "#ffffff", "text_main": "#0c4a6e", "border": "#bae6fd", "input_bg": "#f0f9ff"
+        "primary": "#0284c7", "primary_soft": "#e0f2fe", "bg_app": "#f0f9ff", "bg_sidebar": "#ffffff", 
+        "bg_card": "#ffffff", "text_main": "#0c4a6e", "text_muted": "#0369a1", "border": "transparent", "input_bg": "#f0f9ff",
+        "shadow": "0 4px 20px -2px rgba(2, 132, 199, 0.1)"
     },
     "Natureza (Verde)": {
-        "primary": "#16a34a", "bg_app": "#f0fdf4", "bg_sidebar": "#dcfce7", 
-        "bg_card": "#ffffff", "text_main": "#14532d", "border": "#bbf7d0", "input_bg": "#f0fdf4"
+        "primary": "#16a34a", "primary_soft": "#dcfce7", "bg_app": "#f0fdf4", "bg_sidebar": "#ffffff", 
+        "bg_card": "#ffffff", "text_main": "#14532d", "text_muted": "#15803d", "border": "transparent", "input_bg": "#f0fdf4",
+        "shadow": "0 4px 20px -2px rgba(22, 163, 74, 0.1)"
     },
     "Noturno (Roxo)": {
-        "primary": "#a855f7", "bg_app": "#1e1b4b", "bg_sidebar": "#312e81", 
-        "bg_card": "#2e1065", "text_main": "#e9d5ff", "border": "#4c1d95", "input_bg": "#1e1b4b"
+        "primary": "#a855f7", "primary_soft": "#312e81", "bg_app": "#1e1b4b", "bg_sidebar": "#312e81", 
+        "bg_card": "#2e1065", "text_main": "#e9d5ff", "text_muted": "#c084fc", "border": "#4c1d95", "input_bg": "#1e1b4b",
+        "shadow": "0 4px 20px -2px rgba(0, 0, 0, 0.3)"
     }
 }
 
@@ -101,89 +123,130 @@ tema_selecionado = db["config"].get("tema", "Claro (Padrão)")
 if tema_selecionado not in TEMAS: tema_selecionado = "Claro (Padrão)" # Fallback
 paleta = TEMAS[tema_selecionado]
 
-# --- ESTILIZAÇÃO CSS DINÂMICA ---
+# --- ESTILIZAÇÃO CSS DINÂMICA (BASEADA NO DESIGN DO STITCH) ---
 st.markdown(f"""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap');
+    /* Fonte Oficial do Design */
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
     :root {{
         --primary: {paleta['primary']};
+        --primary-soft: {paleta['primary_soft']};
         --bg-app: {paleta['bg_app']};
         --bg-sidebar: {paleta['bg_sidebar']};
         --bg-card: {paleta['bg_card']};
         --text-main: {paleta['text_main']};
+        --text-muted: {paleta['text_muted']};
         --border-color: {paleta['border']};
         --input-bg: {paleta['input_bg']};
+        --shadow-soft: {paleta['shadow']};
     }}
 
+    /* Reset Global */
     html, body, [class*="css"], .stApp {{
-        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-family: 'Plus Jakarta Sans', sans-serif !important;
         background-color: var(--bg-app);
         color: var(--text-main);
     }}
 
+    /* Sidebar Estilizada */
     [data-testid="stSidebar"] {{
         background-color: var(--bg-sidebar);
-        border-right: 1px solid var(--border-color);
+        border-right: none;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.02);
     }}
-    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, 
-    [data-testid="stSidebar"] span, [data-testid="stSidebar"] label, [data-testid="stSidebar"] div {{
-        color: var(--text-main) !important;
-    }}
-    [data-testid="stSidebar"] .stRadio label {{
+    [data-testid="stSidebar"] * {{
         color: var(--text-main) !important;
     }}
 
+    /* Cards (Containers Nativos Transformados) */
     [data-testid="stVerticalBlockBorderWrapper"] > div {{
         background-color: var(--bg-card);
         border: 1px solid var(--border-color);
-        border-radius: 24px;
-        box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
-        padding: 20px;
+        border-radius: 24px; /* Arredondamento maior do design */
+        box-shadow: var(--shadow-soft);
+        padding: 24px;
+        transition: transform 0.2s ease;
     }}
-
+    
+    /* Botões (Pill Shape) */
     div.stButton > button {{
         background-color: var(--primary);
         color: white !important;
-        border-radius: 12px;
+        border-radius: 16px; /* Pill shape */
         border: none;
-        padding: 12px 24px;
+        padding: 14px 28px;
         font-weight: 700;
+        font-size: 1rem;
+        letter-spacing: 0.02em;
         width: 100%;
-        transition: all 0.2s;
+        box-shadow: 0 4px 12px rgba(244, 37, 54, 0.2); /* Glow sutil */
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }}
     div.stButton > button:hover {{
-        filter: brightness(90%);
-        transform: scale(1.01);
+        filter: brightness(110%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(244, 37, 54, 0.3);
     }}
     
-    .stTextInput input, .stSelectbox div[data-baseweb="select"], .stTextArea textarea, .stDateInput input {{
+    /* Inputs Modernos */
+    .stTextInput input, .stSelectbox div[data-baseweb="select"], .stTextArea textarea, .stDateInput input, .stNumberInput input {{
         background-color: var(--input-bg) !important;
         color: var(--text-main) !important;
-        border: 1px solid var(--border-color);
-        border-radius: 12px;
+        border: 1px solid transparent;
+        border-radius: 16px;
+        padding: 12px 16px;
+        transition: all 0.2s;
+    }}
+    .stTextInput input:focus, .stTextArea textarea:focus {{
+        border-color: var(--primary);
+        box-shadow: 0 0 0 2px var(--primary-soft);
     }}
     
-    .stSlider [data-baseweb="slider"] {{ color: var(--primary); }}
+    /* Headers e Textos */
+    h1, h2, h3, h4 {{ 
+        color: var(--text-main) !important; 
+        font-weight: 800 !important; 
+        letter-spacing: -0.02em;
+    }}
+    p, label, span, div {{ 
+        color: var(--text-main); 
+    }}
+    .stMarkdown p {{ color: var(--text-main) !important; }}
+    
+    /* Sliders */
+    .stSlider [data-baseweb="slider"] {{
+        --thumb-color: var(--primary);
+        --track-color: var(--primary-soft);
+    }}
 
+    /* Card de XP (Gamificação 2.0) */
     .xp-card {{
-        background: linear-gradient(135deg, var(--primary) 0%, #888 100%);
-        background-color: var(--primary);
+        background: linear-gradient(135deg, var(--primary) 0%, #ff5c6a 100%);
         color: white !important;
         border-radius: 24px;
-        padding: 20px;
+        padding: 24px;
         text-align: center;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
-        margin-bottom: 20px;
+        box-shadow: 0 10px 30px -10px var(--primary);
+        margin-bottom: 24px;
+        position: relative;
+        overflow: hidden;
     }}
-    .xp-stat {{ font-size: 3rem; font-weight: 800; line-height: 1; color: white !important; }}
-    .xp-label {{ font-size: 0.9rem; opacity: 0.9; font-weight: 500; color: white !important; }}
-    
-    h1, h2, h3, h4, p, label, span, .stMarkdown p {{ color: var(--text-main) !important; }}
+    .xp-card::before {{
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 60%);
+        opacity: 0.5;
+    }}
     
     .streamlit-expanderHeader {{
-        background-color: var(--bg-card);
-        color: var(--text-main);
+        background-color: var(--input-bg);
+        border-radius: 12px;
+        color: var(--text-main) !important;
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -208,7 +271,7 @@ def gerar_pdf(dados_mes, nome_mes, img_bytes=None):
             pdf.image(img_io, x=15, y=60, w=180)
         except: pass
     pdf.set_font("Arial", "B", 20)
-    pdf.set_text_color(200, 50, 50)
+    pdf.set_text_color(244, 37, 54) # Vermelho primário
     pdf.cell(0, 10, f"Planner {nome_mes}", ln=True, align='C')
     pdf.ln(10)
     for d, i in sorted(dados_mes.items()):
@@ -236,14 +299,17 @@ menu = st.sidebar.radio("", MENU_OPTIONS, index=default_idx)
 # --- HEADER XP ---
 nivel, meta_xp = get_nivel_info(db["xp"])
 if menu == "Dashboard":
+    # HTML Puro para o Card de XP (Design System)
     st.markdown(f"""
     <div class="xp-card">
-        <div class="xp-label">NÍVEL DE CONEXÃO</div>
-        <div class="xp-stat">{nivel}</div>
-        <div style="background: rgba(255,255,255,0.3); height: 6px; border-radius: 3px; margin-top: 10px; overflow: hidden;">
-            <div style="background: white; width: {(db['xp']/meta_xp)*100}%; height: 100%;"></div>
+        <div style="position: relative; z-index: 10;">
+            <div style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; margin-bottom: 5px;">Nível de Conexão</div>
+            <div style="font-size: 3.5rem; font-weight: 800; line-height: 1; margin-bottom: 10px;">{nivel}</div>
+            <div style="background: rgba(0,0,0,0.2); height: 8px; border-radius: 4px; overflow: hidden; margin-top: 15px;">
+                <div style="background: white; width: {(db['xp']/meta_xp)*100}%; height: 100%; border-radius: 4px;"></div>
+            </div>
+            <div style="font-size: 0.8rem; margin-top: 8px; opacity: 0.9; font-weight: 600;">{db['xp']} / {meta_xp} XP para o próximo nível</div>
         </div>
-        <div style="font-size: 0.8rem; margin-top: 5px; opacity: 0.8;">{db['xp']} / {meta_xp} XP</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -258,12 +324,12 @@ if menu == "Dashboard":
         
         if not df_notas.empty:
             chart = alt.Chart(df_notas).mark_line(
-                interpolate='monotone', color=paleta['primary'], strokeWidth=3
+                interpolate='monotone', color=paleta['primary'], strokeWidth=4
             ).encode(
-                x=alt.X('Data', axis=alt.Axis(format='%d/%m')),
-                y=alt.Y('Nota', scale=alt.Scale(domain=[0, 10])),
+                x=alt.X('Data', axis=alt.Axis(format='%d/%m', labelColor=paleta['text_muted'])),
+                y=alt.Y('Nota', scale=alt.Scale(domain=[0, 10]), axis=alt.Axis(labelColor=paleta['text_muted'])),
                 tooltip=['Data', 'Nota']
-            ).properties(height=200)
+            ).properties(height=220).configure_view(strokeWidth=0) # Remove borda do gráfico
             st.altair_chart(chart, use_container_width=True)
         else:
             st.info("Registre seu primeiro dia!")
@@ -272,12 +338,12 @@ if menu == "Dashboard":
     def draw_grid(title, metric, color):
         st.caption(title)
         days = pd.date_range("2026-01-01", "2026-12-31")
-        grid = '<div style="display: flex; flex-wrap: wrap; gap: 3px; max-width: 800px; margin-bottom: 20px;">'
+        grid = '<div style="display: flex; flex-wrap: wrap; gap: 4px; max-width: 800px; margin-bottom: 24px;">'
         for d in days:
             ds = d.strftime("%Y-%m-%d")
             reg = db["registros"].get(ds, {})
-            c = "#ebedf0"
-            if "Escuro" in tema_selecionado or "Noturno" in tema_selecionado: c = "#333333"
+            # Cores baseadas no tema (mais sutil para vazio)
+            c = "#e2e8f0" if "Claro" in tema_selecionado else "#333333"
             
             if ds in db["registros"]:
                 if metric == "nota":
@@ -286,7 +352,8 @@ if menu == "Dashboard":
                 elif metric in LINGUAGENS_LISTA:
                     c = color if metric in reg.get("ling_eu", []) or metric in reg.get("ling_ela", []) else c
                 else: c = color if reg.get(metric) else c
-            grid += f'<div title="{ds}" style="width: 10px; height: 10px; background-color: {c}; border-radius: 2px;"></div>'
+            # Quadrados arredondados (Rounded-sm do Tailwind)
+            grid += f'<div title="{ds}" style="width: 12px; height: 12px; background-color: {c}; border-radius: 4px;"></div>'
         st.markdown(grid + '</div>', unsafe_allow_html=True)
 
     draw_grid("Frequência Sexual", "sexo", "#e91e63")
@@ -403,24 +470,19 @@ elif menu == "Cápsula":
 elif menu == "Configurações":
     st.markdown("## ⚙️ Configurações")
     
-    # SELETOR DE PREFERÊNCIAS (NOVO)
     with st.container(border=True):
-        st.markdown("### 🎨 Aparência & Navegação")
+        st.markdown("### 🎨 Aparência")
+        novo_tema = st.radio("Tema do App:", ["Claro (Padrão)", "Escuro (Padrão)", "Romântico (Rosa)", "Oceano (Azul)", "Natureza (Verde)", "Noturno (Roxo)"], index=list(TEMAS.keys()).index(tema_selecionado))
         
-        # Tema com chaves do dict
-        novo_tema = st.selectbox("Tema do App:", list(TEMAS.keys()), index=list(TEMAS.keys()).index(tema_selecionado))
-        
-        # Página Inicial
         nova_home = st.selectbox("Tela Inicial Padrão:", MENU_OPTIONS, index=MENU_OPTIONS.index(home_preferida))
         
         if st.button("Salvar Preferências"):
             db["config"]["tema"] = novo_tema
             db["config"]["home_page"] = nova_home
             save_all(db)
-            st.success("Salvo! Recarregue a página se necessário.")
+            st.success("Salvo! Recarregue a página.")
             st.rerun()
     
-    # GERENCIAMENTO DE OPÇÕES
     c1, c2 = st.columns(2)
     with c1:
         with st.container(border=True):
@@ -475,7 +537,6 @@ elif menu == "Insights IA":
         periodo = st.select_slider("Quanto tempo analisar?", options=["7 Dias", "15 Dias", "30 Dias", "Tudo"])
         dias_map = {"7 Dias": 7, "15 Dias": 15, "30 Dias": 30, "Tudo": 365}
         
-        # Filtrar dados
         registros_filtrados = list(db["registros"].items())[-dias_map[periodo]:]
         if not registros_filtrados: st.warning("Sem dados suficientes.")
         
@@ -490,12 +551,11 @@ elif menu == "Insights IA":
             prompt = "Aja como um terapeuta. Resuma o relacionamento neste período. Pontos altos e baixos."
             executar = True
         if c_ia2.button("⚖️ Coach de Conflitos"):
-            # Filtrar conflitos
             regs_conf = [(d,r) for d,r in registros_filtrados if r.get('discussao')]
             prompt = "Analise apenas conflitos. Identifique padrões e dê soluções."
             registros_filtrados = regs_conf
             executar = True
-            if not regs_conf: st.success("Sem conflitos! 🎉"); executing = False
+            if not regs_conf: st.success("Sem conflitos! 🎉"); executar = False
 
         c_ia3, c_ia4 = st.columns(2)
         if c_ia3.button("💘 Guru Romântico"):
