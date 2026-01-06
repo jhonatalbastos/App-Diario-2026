@@ -51,14 +51,26 @@ def load_data():
             if k not in data["config"]: data["config"][k] = v
 
         if "acordos_mestres" not in data: data["acordos_mestres"] = []
-        if "metas" not in data: data["metas"] = {"elogios": 3, "qualidade": 2}
+        if "metas" not in data: data["metas"] = {}
+        
+        # Defaults de Metas (Expandido)
+        metas_default = {
+            "elogios": 3, 
+            "qualidade": 2, 
+            "intimidade": 2, 
+            "gratidao": 4, 
+            "paz": 7 # Dias sem briga
+        }
+        for k, v in metas_default.items():
+            if k not in data["metas"]: data["metas"][k] = v
+
         if "configuracoes" not in data:
              data["configuracoes"] = {"opcoes_eu_fiz": ["Elogio", "Tempo de Qualidade"], "opcoes_ela_fez": ["Carinho"]}
         return data
     except:
         return {
             "registros": {}, "eventos": {}, "acordos_mestres": [], "xp": 0,
-            "metas": {"elogios": 3, "qualidade": 2},
+            "metas": {"elogios": 3, "qualidade": 2, "intimidade": 2, "gratidao": 4, "paz": 7},
             "configuracoes": {"opcoes_eu_fiz": ["Elogio"], "opcoes_ela_fez": ["Carinho"]},
             "config": {
                 "modelo_ia": "llama-3.3-70b-versatile", 
@@ -164,7 +176,7 @@ st.markdown(f"""
         transition: all 0.2s;
     }}
     
-    .stTextInput input, .stSelectbox div[data-baseweb="select"], .stTextArea textarea, .stDateInput input {{
+    .stTextInput input, .stSelectbox div[data-baseweb="select"], .stTextArea textarea, .stDateInput input, .stNumberInput input {{
         background-color: {paleta['input_bg']} !important;
         color: var(--text-main) !important;
         border-radius: 16px;
@@ -209,6 +221,19 @@ st.markdown(f"""
         margin-left: auto;
     }}
     
+    /* XP Badge nas Metas */
+    .xp-badge {{
+        font-size: 0.7rem; 
+        background-color: #fbbf24; 
+        color: #78350f; 
+        padding: 2px 6px; 
+        border-radius: 6px; 
+        font-weight: 800;
+        margin-left: 8px;
+        vertical-align: middle;
+        display: inline-block;
+    }}
+    
     .material-icons {{ font-family: 'Material Symbols Outlined'; font-size: 20px; vertical-align: middle; margin-right: 8px; }}
 </style>
 """, unsafe_allow_html=True)
@@ -219,7 +244,7 @@ CATEGORIAS_DR = ["Comunicação", "Finanças", "Ciúmes", "Família", "Rotina", 
 ICONES_ACORDOS = ["❤️", "🤝", "💰", "🏠", "📅", "🔥", "🙏", "✈️", "🥗", "💪", "🐶", "👶", "🚫", "🍷", "🎮"]
 FREQ_ACORDOS = ["Diário", "Semanal", "Mensal", "Anual", "Único", "Sem Data"]
 
-# --- LÓGICA GAMIFICAÇÃO AVANÇADA (VERSÃO 6.8) ---
+# --- LÓGICA GAMIFICAÇÃO AVANÇADA ---
 def calcular_gamificacao(db):
     xp = db["xp"]
     nivel = int((xp / 100) ** 0.5) + 1
@@ -232,8 +257,6 @@ def calcular_gamificacao(db):
 def verificar_conquistas_robustas(db):
     regs = db["registros"]
     total_logs = len(regs)
-    
-    # Cálculos Estatísticos
     datas = sorted([datetime.strptime(k, "%Y-%m-%d") for k in regs.keys()])
     streak = 0
     if datas:
@@ -245,12 +268,8 @@ def verificar_conquistas_robustas(db):
     total_sexo = sum(1 for r in regs.values() if r.get('sexo'))
     total_gratidao = sum(1 for r in regs.values() if r.get('gratidao'))
     total_sem_dr = sum(1 for r in regs.values() if not r.get('discussao'))
-    
-    total_acordos_cumpridos = 0
-    for r in regs.values():
-        total_acordos_cumpridos += sum(1 for v in r.get('checks_acordos', {}).values() if v)
+    total_acordos_cumpridos = sum(sum(1 for v in r.get('checks_acordos', {}).values() if v) for r in regs.values())
 
-    # Definição das Conquistas (Lista Robusta)
     trofeus = {
         "🔥 Constância": [
             {"t": "Primeiro Passo", "d": "1 Registro", "i": "flag", "m": 1, "v": total_logs},
@@ -265,7 +284,7 @@ def verificar_conquistas_robustas(db):
             {"t": "Poeta", "d": "Escreva 10 Elogios", "i": "edit_note", "m": 10, "v": sum(1 for r in regs.values() if any('Elogio' in str(x) for x in [r.get('eu_fiz', []), r.get('ela_fez', [])]))},
         ],
         "☮️ Harmonia": [
-            {"t": "Paz Interior", "d": "7 Dias sem Discussão", "i": "spa", "m": 7, "v": total_sem_dr}, # Simplificado para total
+            {"t": "Paz Interior", "d": "7 Dias sem Discussão", "i": "spa", "m": 7, "v": total_sem_dr},
             {"t": "Coração Grato", "d": "10 Gratidões", "i": "volunteer_activism", "m": 10, "v": total_gratidao},
             {"t": "Alma Iluminada", "d": "50 Gratidões", "i": "diamond", "m": 50, "v": total_gratidao},
         ],
@@ -277,17 +296,10 @@ def verificar_conquistas_robustas(db):
     }
     return trofeus
 
-# --- CALCULAR CUMPRIMENTO DE ACORDOS ---
 def calcular_stats_acordo(titulo_acordo):
     total_dias = len(db["registros"])
     if total_dias == 0: return 0, 0
-    
-    cumpridos = 0
-    for reg in db["registros"].values():
-        checks = reg.get("checks_acordos", {})
-        if checks.get(titulo_acordo):
-            cumpridos += 1
-            
+    cumpridos = sum(1 for reg in db["registros"].values() if reg.get("checks_acordos", {}).get(titulo_acordo))
     return cumpridos, total_dias
 
 # --- MODAL DE MEMÓRIA ---
@@ -481,18 +493,45 @@ elif menu == "Metas & Acordos":
                 if st.button("🗑️", key=f"del_{i}"): db["acordos_mestres"].pop(i); save_all(db); st.rerun()
 
     st.divider()
-    st.markdown("### 🎯 Metas da Semana")
-    hoje = date.today(); inicio_sem = hoje - timedelta(days=hoje.weekday())
+    st.markdown("### 🎯 Metas da Semana (Expandido)")
+    
+    # Cálculos das Metas Semanais (Versão 6.9)
+    hoje = date.today()
+    inicio_sem = hoje - timedelta(days=hoje.weekday())
     reg_semana = [db["registros"].get((inicio_sem + timedelta(days=i)).strftime("%Y-%m-%d"), {}) for i in range(7)]
+    
+    # Contadores
     c_elogios = sum(1 for r in reg_semana if "Elogio" in str(r.get("eu_fiz", [])))
-    st.write(f"**Elogios** ({c_elogios}/{db['metas']['elogios']})")
-    st.progress(min(c_elogios/db['metas']['elogios'], 1.0))
+    c_qualidade = sum(1 for r in reg_semana if "Tempo de Qualidade" in str(r.get("eu_fiz", [])))
+    c_intimidade = sum(1 for r in reg_semana if r.get("sexo"))
+    c_gratidao = sum(1 for r in reg_semana if r.get("gratidao"))
+    c_paz = sum(1 for r in reg_semana if not r.get("discussao")) # Dias SEM discussão
+    
+    metas = db["metas"] # Metas configuradas
+    
+    def render_meta(titulo, icone, atual, alvo, xp_valor, cor="#f42536"):
+        pct = min(atual / alvo, 1.0) if alvo > 0 else 0
+        with st.container(border=True):
+            st.markdown(f"""
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                <div style="font-weight:700;">{icone} {titulo} <span class="xp-badge">+{xp_valor} XP/cada</span></div>
+                <div style="font-size:0.8rem; font-weight:600;">{atual}/{alvo}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.progress(pct)
 
-# --- 4. CONQUISTAS (REFORMULADO VERSÃO 6.8) ---
+    c_m1, c_m2 = st.columns(2)
+    with c_m1:
+        render_meta("Elogios", "💌", c_elogios, metas["elogios"], 5)
+        render_meta("Tempo Qualidade", "🕰️", c_qualidade, metas["qualidade"], 10)
+        render_meta("Sem Discussões", "🕊️", c_paz, metas["paz"], 15)
+    with c_m2:
+        render_meta("Intimidade", "🔥", c_intimidade, metas["intimidade"], 20)
+        render_meta("Gratidão", "🙏", c_gratidao, metas["gratidao"], 5)
+
+# --- 4. CONQUISTAS ---
 elif menu == "🏆 Conquistas":
     nivel, xp, xp_prox, prog, dias = calcular_gamificacao(db)
-    
-    # Header Stats
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(f"""<div style="background:{paleta['bg_card']}; border-radius:24px; padding:20px; text-align:center; border:1px solid {paleta['border']}; box-shadow:{paleta['shadow']}">
@@ -502,44 +541,28 @@ elif menu == "🏆 Conquistas":
         st.markdown(f"""<div style="background:{paleta['bg_card']}; border-radius:24px; padding:20px; text-align:center; border:1px solid {paleta['border']}; box-shadow:{paleta['shadow']}">
             <div style="font-size:2rem; font-weight:800; color:{paleta['text_main']}">{nivel}</div><div style="font-size:0.7rem; font-weight:700; color:{paleta['text_muted']}">NÍVEL ATUAL</div>
         </div>""", unsafe_allow_html=True)
+    st.write(""); st.progress(prog); st.caption(f"{xp}/{xp_prox} XP")
     
-    st.write("")
-    with st.container(border=True):
-        st.markdown(f"**Progresso para o Nível {nivel+1}**")
-        st.progress(prog)
-        st.caption(f"Faltam {int(xp_prox - xp)} XP")
-
-    # Galeria de Troféus
     st.divider()
     st.markdown("### 🏛️ Galeria de Troféus")
-    
-    categorias_conquistas = verificar_conquistas_robustas(db)
-    
-    for cat_nome, trofeus in categorias_conquistas.items():
-        with st.expander(cat_nome, expanded=True):
+    cats = verificar_conquistas_robustas(db)
+    for cat, trfs in cats.items():
+        with st.expander(cat, expanded=True):
             cols = st.columns(2)
-            for i, t in enumerate(trofeus):
-                concluido = t['v'] >= t['m']
-                pct = min(t['v'] / t['m'], 1.0)
-                
-                # Estilo Visual (Cinza se bloqueado, Colorido se desbloqueado)
-                cor_icone = paleta['primary'] if concluido else "#9ca3af"
-                bg_card = f"{paleta['primary']}10" if concluido else "#f3f4f6"
-                if "Escuro" in tema_selecionado and not concluido: bg_card = "#2d2d2d"
-                icon_name = "lock" if not concluido else t['i']
-                
-                with cols[i % 2]:
+            for i, t in enumerate(trfs):
+                ok = t['v'] >= t['m']
+                clr = paleta['primary'] if ok else "#999"
+                bg = f"{paleta['primary']}15" if ok else ("#333" if "Escuro" in tema_selecionado else "#eee")
+                icon = t['i'] if ok else "lock"
+                with cols[i%2]:
                     st.markdown(f"""
-                    <div style="background-color: {bg_card}; border-radius: 16px; padding: 15px; margin-bottom: 10px; height: 100%;">
-                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                            <span class="material-icons" style="color: {cor_icone}; font-size: 24px;">{icon_name}</span>
-                            <div style="font-weight: 700; font-size: 0.9rem; line-height: 1.1;">{t['t']}</div>
+                    <div style="background:{bg}; border-radius:16px; padding:15px; margin-bottom:10px;">
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <span class="material-icons" style="color:{clr}">{icon}</span>
+                            <div style="font-weight:700; font-size:0.9rem;">{t['t']}</div>
                         </div>
-                        <div style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 8px;">{t['d']}</div>
-                        <div style="background: rgba(0,0,0,0.1); height: 4px; border-radius: 2px; overflow: hidden;">
-                            <div style="background: {cor_icone}; width: {pct*100}%; height: 100%;"></div>
-                        </div>
-                        <div style="font-size: 0.7rem; text-align: right; margin-top: 4px;">{t['v']}/{t['m']}</div>
+                        <div style="font-size:0.75rem; opacity:0.8; margin:5px 0;">{t['d']}</div>
+                        <div style="font-size:0.7rem; text-align:right;">{t['v']}/{t['m']}</div>
                     </div>
                     """, unsafe_allow_html=True)
 
@@ -559,7 +582,6 @@ elif menu == "⏳ Cápsula":
                 st.markdown(f"<div style='background-color:{bg}; color:white; padding:15px; border-radius:12px; margin-bottom:10px;'>Nota: {nota}/10 - {reg.get('resumo', '')[:50]}...</div>", unsafe_allow_html=True)
                 if st.button("Ver Memória", key=f"btn_{data_str}"): ver_memoria(data_str, reg)
         else: st.caption(f"{label}: Sem registros.")
-    
     st.divider()
     with st.expander("📥 Exportar Relatório em PDF"):
         mes_sel = st.selectbox("Mês:", ["01","02","03","04","05","06","07","08","09","10","11","12"])
@@ -602,6 +624,8 @@ elif menu == "Insights IA":
 # --- 7. CONFIGURAÇÕES ---
 elif menu == "Configurações":
     st.markdown("## ⚙️ Configurações & Perfil")
+    
+    # 1. PERFIL
     with st.container(border=True):
         col_pic, col_info = st.columns([1, 3])
         with col_pic:
@@ -624,6 +648,18 @@ elif menu == "Configurações":
         with cols_tema[i % 3]:
             if st.button(tema, key=f"btn_tema_{tema}", use_container_width=True): db["config"]["tema"] = tema; save_all(db); st.rerun()
     
+    st.markdown("### 🎯 Metas Semanais (Alvos)")
+    with st.container(border=True):
+        c_alvo1, c_alvo2 = st.columns(2)
+        with c_alvo1:
+            db["metas"]["elogios"] = st.number_input("Meta Elogios:", value=db["metas"]["elogios"])
+            db["metas"]["qualidade"] = st.number_input("Meta Qualidade:", value=db["metas"]["qualidade"])
+            db["metas"]["gratidao"] = st.number_input("Meta Gratidão:", value=db["metas"].get("gratidao", 4))
+        with c_alvo2:
+            db["metas"]["intimidade"] = st.number_input("Meta Intimidade:", value=db["metas"].get("intimidade", 2))
+            db["metas"]["paz"] = st.number_input("Meta Dias de Paz:", value=db["metas"].get("paz", 7))
+        if st.button("Salvar Metas"): save_all(db); st.success("Metas Atualizadas!")
+
     st.markdown("### 🛠️ Personalização do Diário")
     c1, c2 = st.columns(2)
     with c1:
