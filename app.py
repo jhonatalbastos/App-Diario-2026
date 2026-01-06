@@ -493,7 +493,7 @@ elif menu == "Metas & Acordos":
                 if st.button("🗑️", key=f"del_{i}"): db["acordos_mestres"].pop(i); save_all(db); st.rerun()
 
     st.divider()
-    st.markdown("### 🎯 Metas da Semana (Expandido)")
+    st.markdown("### 🎯 Metas da Semana ")
     
     # Cálculos das Metas Semanais (Versão 6.9)
     hoje = date.today()
