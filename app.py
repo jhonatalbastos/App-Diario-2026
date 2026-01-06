@@ -51,6 +51,11 @@ st.markdown("""
         background-color: #d11a2a;
         color: white;
     }
+    
+    /* Botão de Excluir (Visual Diferente) */
+    div.stButton > button.delete-btn {
+        background-color: #ef4444;
+    }
 
     .xp-card {
         background: linear-gradient(135deg, #f42536 0%, #ff5c6a 100%);
@@ -120,7 +125,6 @@ def gerar_pdf(dados_mes, nome_mes, img_bytes=None):
     pdf = FPDF()
     pdf.add_page()
     
-    # Capa Opcional
     if img_bytes:
         try:
             img_io = io.BytesIO(img_bytes)
@@ -184,7 +188,6 @@ if menu == "Dashboard":
             st.info("Registre seu primeiro dia para ver o gráfico!")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Grids (Restaurados no Dashboard)
     st.markdown("### 🔥 Mapas de Calor")
     def draw_grid(title, metric, color):
         st.caption(title)
@@ -232,7 +235,6 @@ elif menu == "Registrar Dia":
             with c1:
                 st.caption("JHONATA (EU)")
                 eu_fiz = st.multiselect("Eu fiz:", db["configuracoes"]["opcoes_eu_fiz"], day_data.get("eu_fiz", []))
-                # RESTAURADO: Linguagens do Amor
                 ling_eu = st.multiselect("Minhas Linguagens:", LINGUAGENS_LISTA, day_data.get("ling_eu", []))
                 
                 disc = st.checkbox("Teve DR?", day_data.get("discussao", False))
@@ -241,7 +243,6 @@ elif menu == "Registrar Dia":
             with c2:
                 st.caption("KATHERYN (ELA)")
                 ela_fez = st.multiselect("Ela fez:", db["configuracoes"]["opcoes_ela_fez"], day_data.get("ela_fez", []))
-                # RESTAURADO: Linguagens do Amor
                 ling_ela = st.multiselect("Linguagens Dela:", LINGUAGENS_LISTA, day_data.get("ling_ela", []))
                 
                 sexo = st.radio("Intimidade:", ["Sim", "Não"], index=0 if day_data.get("sexo", True) else 1, horizontal=True)
@@ -316,7 +317,7 @@ elif menu == "Cápsula":
         mes_sel = st.selectbox("Mês:", ["01","02","03","04","05","06","07","08","09","10","11","12"])
         up_img = st.file_uploader("Capa (Opcional):", type=["png","jpg"])
     with c_pdf2:
-        st.write("") # Spacer
+        st.write("") 
         st.write("")
         if st.button("Gerar PDF"):
             dados_mes = {k: v for k, v in db["registros"].items() if k.split("-")[1] == mes_sel}
@@ -328,7 +329,7 @@ elif menu == "Cápsula":
                 st.warning("Sem dados.")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- 5. CONFIGURAÇÕES (ATUALIZADA) ---
+# --- 5. CONFIGURAÇÕES (GERENCIAMENTO COMPLETO) ---
 elif menu == "Configurações":
     st.markdown("## ⚙️ Ajustes")
     
@@ -336,35 +337,67 @@ elif menu == "Configurações":
     
     with c1:
         st.markdown('<div class="css-card">', unsafe_allow_html=True)
-        st.markdown("### Eu Fiz")
-        new_eu = st.text_input("Nova opção 'Eu fiz':")
+        st.markdown("### Gerenciar 'Eu Fiz'")
+        
+        # Adicionar
+        new_eu = st.text_input("Novo:", key="new_eu")
         if st.button("Adicionar (Eu)"):
-            if new_eu:
+            if new_eu and new_eu not in db["configuracoes"]["opcoes_eu_fiz"]:
                 db["configuracoes"]["opcoes_eu_fiz"].append(new_eu)
                 save_all(db); st.rerun()
-        # Listar para remover
-        st.markdown("**Atuais:**")
-        for o in db["configuracoes"]["opcoes_eu_fiz"]:
-            st.caption(f"- {o}")
+        
+        st.divider()
+        
+        # Editar/Excluir
+        opts_eu = db["configuracoes"]["opcoes_eu_fiz"]
+        if opts_eu:
+            sel_eu = st.selectbox("Editar/Excluir:", opts_eu, key="sel_eu")
+            edit_eu = st.text_input("Renomear para:", value=sel_eu, key="ren_eu")
+            
+            ce1, ce2 = st.columns(2)
+            if ce1.button("Renomear", key="btn_ren_eu"):
+                idx = opts_eu.index(sel_eu)
+                db["configuracoes"]["opcoes_eu_fiz"][idx] = edit_eu
+                save_all(db); st.rerun()
+            if ce2.button("Excluir", key="btn_del_eu"):
+                db["configuracoes"]["opcoes_eu_fiz"].remove(sel_eu)
+                save_all(db); st.rerun()
+                
         st.markdown('</div>', unsafe_allow_html=True)
 
     with c2:
-        # ADICIONADO: Configuração para "Ela Fez"
         st.markdown('<div class="css-card">', unsafe_allow_html=True)
-        st.markdown("### Ela Fez")
-        new_ela = st.text_input("Nova opção 'Ela fez':")
+        st.markdown("### Gerenciar 'Ela Fez'")
+        
+        # Adicionar
+        new_ela = st.text_input("Novo:", key="new_ela")
         if st.button("Adicionar (Ela)"):
-            if new_ela:
+            if new_ela and new_ela not in db["configuracoes"]["opcoes_ela_fez"]:
                 db["configuracoes"]["opcoes_ela_fez"].append(new_ela)
                 save_all(db); st.rerun()
-        st.markdown("**Atuais:**")
-        for o in db["configuracoes"]["opcoes_ela_fez"]:
-            st.caption(f"- {o}")
+        
+        st.divider()
+        
+        # Editar/Excluir
+        opts_ela = db["configuracoes"]["opcoes_ela_fez"]
+        if opts_ela:
+            sel_ela = st.selectbox("Editar/Excluir:", opts_ela, key="sel_ela")
+            edit_ela = st.text_input("Renomear para:", value=sel_ela, key="ren_ela")
+            
+            ce3, ce4 = st.columns(2)
+            if ce3.button("Renomear", key="btn_ren_ela"):
+                idx = opts_ela.index(sel_ela)
+                db["configuracoes"]["opcoes_ela_fez"][idx] = edit_ela
+                save_all(db); st.rerun()
+            if ce4.button("Excluir", key="btn_del_ela"):
+                db["configuracoes"]["opcoes_ela_fez"].remove(sel_ela)
+                save_all(db); st.rerun()
+
         st.markdown('</div>', unsafe_allow_html=True)
 
     with st.container():
         st.markdown('<div class="css-card">', unsafe_allow_html=True)
-        if st.button("Limpar Cache (Se der erro)"):
+        if st.button("Limpar Cache (Se der erro visual)"):
              st.cache_data.clear()
         st.markdown('</div>', unsafe_allow_html=True)
 
