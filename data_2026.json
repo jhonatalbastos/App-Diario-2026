@@ -123,7 +123,8 @@
     "xp": 35,
     "config": {
         "modelo_ia": "llama-3.3-70b-versatile",
-        "tema": "Claro"
+        "tema": "Oceano (Azul)",
+        "home_page": "Registrar Dia"
     },
     "metas": {
         "elogios": 3,
