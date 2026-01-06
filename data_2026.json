@@ -88,8 +88,8 @@
             "discussao": false,
             "cat_dr": null,
             "sexo": true,
-            "resumo": "",
-            "locked": false
+            "resumo": "Conversamos sobre uma mensagem que minha filha mandou no meu telefone perguntando entre outras coisas porque eu estou sendo ruim com ela. Minha filha não entender (ou se faz de sonsa) que as atitudes dela contra minha mulher e contra mim tem consequências. Depois jogamos varias partidas de dama e ela me ganhou varias vezes, 5x3. Jantamos, fizemos amor e fomos dormir agarrados. ",
+            "locked": true
         }
     },
     "eventos": {
@@ -111,7 +111,7 @@
             "Beijos"
         ]
     },
-    "xp": 25,
+    "xp": 30,
     "config": {
         "modelo_ia": "llama-3.3-70b-versatile"
     },
