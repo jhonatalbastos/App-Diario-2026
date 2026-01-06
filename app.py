@@ -34,19 +34,28 @@ def load_data():
         data = json.loads(contents.decoded_content.decode())
         # Garantir chaves essenciais
         if "xp" not in data: data["xp"] = 0
-        if "config" not in data: data["config"] = {"modelo_ia": "llama-3.3-70b-versatile", "tema": "Claro"}
+        if "config" not in data: data["config"] = {}
+        
+        # Defaults Config
+        if "modelo_ia" not in data["config"]: data["config"]["modelo_ia"] = "llama-3.3-70b-versatile"
+        if "tema" not in data["config"]: data["config"]["tema"] = "Claro (Padrão)"
+        if "home_page" not in data["config"]: data["config"]["home_page"] = "Dashboard"
+
         if "acordos_mestres" not in data: data["acordos_mestres"] = []
         if "metas" not in data: data["metas"] = {"elogios": 3, "qualidade": 2}
         if "configuracoes" not in data:
              data["configuracoes"] = {"opcoes_eu_fiz": ["Elogio", "Tempo de Qualidade"], "opcoes_ela_fez": ["Carinho"]}
-        if "tema" not in data["config"]: data["config"]["tema"] = "Claro"
         return data
     except:
         return {
             "registros": {}, "eventos": {}, "acordos_mestres": [], "xp": 0,
             "metas": {"elogios": 3, "qualidade": 2},
             "configuracoes": {"opcoes_eu_fiz": ["Elogio"], "opcoes_ela_fez": ["Carinho"]},
-            "config": {"modelo_ia": "llama-3.3-70b-versatile", "tema": "Claro"}
+            "config": {
+                "modelo_ia": "llama-3.3-70b-versatile", 
+                "tema": "Claro (Padrão)",
+                "home_page": "Dashboard"
+            }
         }
 
 def save_all(data):
@@ -59,52 +68,60 @@ def save_all(data):
 
 # Carregar dados
 db = load_data()
-tema_atual = db["config"].get("tema", "Claro")
 
-# --- DEFINIÇÃO DE CORES POR TEMA (CORREÇÃO VISUAL) ---
-if tema_atual == "Escuro":
-    # Paleta Dark Mode
-    cor_bg = "#0e1117"          # Fundo geral do Streamlit Dark
-    cor_sidebar = "#262730"     # Fundo da Sidebar Dark
-    cor_card = "#1e1e1e"        # Fundo dos Cards
-    cor_texto = "#fafafa"       # Texto quase branco
-    cor_texto_sec = "#b0b0b0"   # Texto secundário
-    cor_border = "#333333"      # Bordas sutis
-    cor_input_bg = "#2b2c35"    # Fundo de inputs
-else:
-    # Paleta Light Mode
-    cor_bg = "#fcf8f8"
-    cor_sidebar = "#f0f2f6"
-    cor_card = "#ffffff"
-    cor_texto = "#1c0d0e"
-    cor_texto_sec = "#555555"
-    cor_border = "#e8ced1"
-    cor_input_bg = "#ffffff"
+# --- SISTEMA DE TEMAS AVANÇADO ---
+TEMAS = {
+    "Claro (Padrão)": {
+        "primary": "#f42536", "bg_app": "#fcf8f8", "bg_sidebar": "#f0f2f6", 
+        "bg_card": "#ffffff", "text_main": "#1c0d0e", "border": "#e8ced1", "input_bg": "#ffffff"
+    },
+    "Escuro (Padrão)": {
+        "primary": "#f42536", "bg_app": "#0e1117", "bg_sidebar": "#262730", 
+        "bg_card": "#1e1e1e", "text_main": "#fafafa", "border": "#333333", "input_bg": "#2b2c35"
+    },
+    "Romântico (Rosa)": {
+        "primary": "#db2777", "bg_app": "#fff1f2", "bg_sidebar": "#fce7f3", 
+        "bg_card": "#ffffff", "text_main": "#831843", "border": "#fbcfe8", "input_bg": "#fff0f5"
+    },
+    "Oceano (Azul)": {
+        "primary": "#0284c7", "bg_app": "#f0f9ff", "bg_sidebar": "#e0f2fe", 
+        "bg_card": "#ffffff", "text_main": "#0c4a6e", "border": "#bae6fd", "input_bg": "#f0f9ff"
+    },
+    "Natureza (Verde)": {
+        "primary": "#16a34a", "bg_app": "#f0fdf4", "bg_sidebar": "#dcfce7", 
+        "bg_card": "#ffffff", "text_main": "#14532d", "border": "#bbf7d0", "input_bg": "#f0fdf4"
+    },
+    "Noturno (Roxo)": {
+        "primary": "#a855f7", "bg_app": "#1e1b4b", "bg_sidebar": "#312e81", 
+        "bg_card": "#2e1065", "text_main": "#e9d5ff", "border": "#4c1d95", "input_bg": "#1e1b4b"
+    }
+}
 
-# --- ESTILIZAÇÃO CSS DINÂMICA (CORRIGIDA) ---
+tema_selecionado = db["config"].get("tema", "Claro (Padrão)")
+if tema_selecionado not in TEMAS: tema_selecionado = "Claro (Padrão)" # Fallback
+paleta = TEMAS[tema_selecionado]
+
+# --- ESTILIZAÇÃO CSS DINÂMICA ---
 st.markdown(f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap');
 
     :root {{
-        --primary: #f42536;
-        --bg-app: {cor_bg};
-        --bg-sidebar: {cor_sidebar};
-        --bg-card: {cor_card};
-        --text-main: {cor_texto};
-        --text-sec: {cor_texto_sec};
-        --border-color: {cor_border};
-        --input-bg: {cor_input_bg};
+        --primary: {paleta['primary']};
+        --bg-app: {paleta['bg_app']};
+        --bg-sidebar: {paleta['bg_sidebar']};
+        --bg-card: {paleta['bg_card']};
+        --text-main: {paleta['text_main']};
+        --border-color: {paleta['border']};
+        --input-bg: {paleta['input_bg']};
     }}
 
-    /* Fonte Global */
     html, body, [class*="css"], .stApp {{
         font-family: 'Plus Jakarta Sans', sans-serif;
         background-color: var(--bg-app);
         color: var(--text-main);
     }}
 
-    /* CORREÇÃO SIDEBAR: Forçar cores corretas na barra lateral */
     [data-testid="stSidebar"] {{
         background-color: var(--bg-sidebar);
         border-right: 1px solid var(--border-color);
@@ -113,21 +130,18 @@ st.markdown(f"""
     [data-testid="stSidebar"] span, [data-testid="stSidebar"] label, [data-testid="stSidebar"] div {{
         color: var(--text-main) !important;
     }}
-    /* Cor dos Radio Buttons na Sidebar */
     [data-testid="stSidebar"] .stRadio label {{
         color: var(--text-main) !important;
     }}
 
-    /* Estilo dos Containers (Cards) */
     [data-testid="stVerticalBlockBorderWrapper"] > div {{
         background-color: var(--bg-card);
         border: 1px solid var(--border-color);
         border-radius: 24px;
-        box-shadow: 0 4px 20px -2px rgba(244, 37, 54, 0.05);
+        box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
         padding: 20px;
     }}
 
-    /* Botões */
     div.stButton > button {{
         background-color: var(--primary);
         color: white !important;
@@ -139,11 +153,10 @@ st.markdown(f"""
         transition: all 0.2s;
     }}
     div.stButton > button:hover {{
-        background-color: #d11a2a;
+        filter: brightness(90%);
         transform: scale(1.01);
     }}
     
-    /* Inputs (Correção para ficarem visíveis no escuro) */
     .stTextInput input, .stSelectbox div[data-baseweb="select"], .stTextArea textarea, .stDateInput input {{
         background-color: var(--input-bg) !important;
         color: var(--text-main) !important;
@@ -151,30 +164,23 @@ st.markdown(f"""
         border-radius: 12px;
     }}
     
-    /* Sliders */
-    .stSlider [data-baseweb="slider"] {{
-        color: var(--primary);
-    }}
+    .stSlider [data-baseweb="slider"] {{ color: var(--primary); }}
 
-    /* Card de XP (Gamificação) */
     .xp-card {{
-        background: linear-gradient(135deg, #f42536 0%, #ff5c6a 100%);
+        background: linear-gradient(135deg, var(--primary) 0%, #888 100%);
+        background-color: var(--primary);
         color: white !important;
         border-radius: 24px;
         padding: 20px;
         text-align: center;
-        box-shadow: 0 10px 25px -5px rgba(244, 37, 54, 0.4);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
         margin-bottom: 20px;
     }}
     .xp-stat {{ font-size: 3rem; font-weight: 800; line-height: 1; color: white !important; }}
     .xp-label {{ font-size: 0.9rem; opacity: 0.9; font-weight: 500; color: white !important; }}
     
-    /* Títulos */
-    h1, h2, h3, h4 {{ color: var(--text-main) !important; }}
-    p, label, span {{ color: var(--text-main); }}
-    .stMarkdown p {{ color: var(--text-main) !important; }}
+    h1, h2, h3, h4, p, label, span, .stMarkdown p {{ color: var(--text-main) !important; }}
     
-    /* Expander */
     .streamlit-expanderHeader {{
         background-color: var(--bg-card);
         color: var(--text-main);
@@ -202,7 +208,7 @@ def gerar_pdf(dados_mes, nome_mes, img_bytes=None):
             pdf.image(img_io, x=15, y=60, w=180)
         except: pass
     pdf.set_font("Arial", "B", 20)
-    pdf.set_text_color(244, 37, 54)
+    pdf.set_text_color(200, 50, 50)
     pdf.cell(0, 10, f"Planner {nome_mes}", ln=True, align='C')
     pdf.ln(10)
     for d, i in sorted(dados_mes.items()):
@@ -214,9 +220,18 @@ def gerar_pdf(dados_mes, nome_mes, img_bytes=None):
         pdf.ln(5)
     return bytes(pdf.output())
 
-# --- NAVEGAÇÃO ---
+# --- NAVEGAÇÃO COM TELA INICIAL DEFINIDA ---
+MENU_OPTIONS = ["Dashboard", "Registrar Dia", "Metas & Acordos", "Cápsula", "Insights IA", "Configurações"]
+home_preferida = db["config"].get("home_page", "Dashboard")
+
+# Tenta encontrar o índice da página preferida, senão 0
+try:
+    default_idx = MENU_OPTIONS.index(home_preferida)
+except:
+    default_idx = 0
+
 st.sidebar.markdown("### ❤️ Menu")
-menu = st.sidebar.radio("", ["Dashboard", "Registrar Dia", "Metas & Acordos", "Cápsula", "Insights IA", "Configurações"])
+menu = st.sidebar.radio("", MENU_OPTIONS, index=default_idx)
 
 # --- HEADER XP ---
 nivel, meta_xp = get_nivel_info(db["xp"])
@@ -243,7 +258,7 @@ if menu == "Dashboard":
         
         if not df_notas.empty:
             chart = alt.Chart(df_notas).mark_line(
-                interpolate='monotone', color='#f42536', strokeWidth=3
+                interpolate='monotone', color=paleta['primary'], strokeWidth=3
             ).encode(
                 x=alt.X('Data', axis=alt.Axis(format='%d/%m')),
                 y=alt.Y('Nota', scale=alt.Scale(domain=[0, 10])),
@@ -262,12 +277,12 @@ if menu == "Dashboard":
             ds = d.strftime("%Y-%m-%d")
             reg = db["registros"].get(ds, {})
             c = "#ebedf0"
-            if tema_atual == "Escuro": c = "#333333"
+            if "Escuro" in tema_selecionado or "Noturno" in tema_selecionado: c = "#333333"
             
             if ds in db["registros"]:
                 if metric == "nota":
                     n = reg.get("nota", 0)
-                    c = "#216e39" if n >= 8 else "#f9d71c" if n >= 5 else "#f44336"
+                    c = "#22c55e" if n >= 8 else "#eab308" if n >= 5 else "#ef4444"
                 elif metric in LINGUAGENS_LISTA:
                     c = color if metric in reg.get("ling_eu", []) or metric in reg.get("ling_ela", []) else c
                 else: c = color if reg.get(metric) else c
@@ -388,14 +403,24 @@ elif menu == "Cápsula":
 elif menu == "Configurações":
     st.markdown("## ⚙️ Configurações")
     
+    # SELETOR DE PREFERÊNCIAS (NOVO)
     with st.container(border=True):
-        st.markdown("### 🎨 Aparência")
-        novo_tema = st.radio("Tema do App:", ["Claro", "Escuro"], index=0 if tema_atual == "Claro" else 1, horizontal=True)
-        if novo_tema != tema_atual:
+        st.markdown("### 🎨 Aparência & Navegação")
+        
+        # Tema com chaves do dict
+        novo_tema = st.selectbox("Tema do App:", list(TEMAS.keys()), index=list(TEMAS.keys()).index(tema_selecionado))
+        
+        # Página Inicial
+        nova_home = st.selectbox("Tela Inicial Padrão:", MENU_OPTIONS, index=MENU_OPTIONS.index(home_preferida))
+        
+        if st.button("Salvar Preferências"):
             db["config"]["tema"] = novo_tema
+            db["config"]["home_page"] = nova_home
             save_all(db)
+            st.success("Salvo! Recarregue a página se necessário.")
             st.rerun()
     
+    # GERENCIAMENTO DE OPÇÕES
     c1, c2 = st.columns(2)
     with c1:
         with st.container(border=True):
@@ -408,10 +433,10 @@ elif menu == "Configurações":
             st.divider()
             opts_eu = db["configuracoes"]["opcoes_eu_fiz"]
             if opts_eu:
-                sel_eu = st.selectbox("Editar item:", opts_eu, key="sel_eu")
+                sel_eu = st.selectbox("Editar:", opts_eu, key="sel_eu")
                 rename_eu = st.text_input("Renomear para:", value=sel_eu, key="ren_eu")
                 ce1, ce2 = st.columns(2)
-                if ce1.button("Salvar Nome", key="sn_eu"):
+                if ce1.button("Salvar", key="sn_eu"):
                     idx = opts_eu.index(sel_eu)
                     db["configuracoes"]["opcoes_eu_fiz"][idx] = rename_eu
                     save_all(db); st.rerun()
@@ -430,10 +455,10 @@ elif menu == "Configurações":
             st.divider()
             opts_ela = db["configuracoes"]["opcoes_ela_fez"]
             if opts_ela:
-                sel_ela = st.selectbox("Editar item:", opts_ela, key="sel_ela")
+                sel_ela = st.selectbox("Editar:", opts_ela, key="sel_ela")
                 rename_ela = st.text_input("Renomear para:", value=sel_ela, key="ren_ela")
                 ce3, ce4 = st.columns(2)
-                if ce3.button("Salvar Nome", key="sn_ela"):
+                if ce3.button("Salvar", key="sn_ela"):
                     idx = opts_ela.index(sel_ela)
                     db["configuracoes"]["opcoes_ela_fez"][idx] = rename_ela
                     save_all(db); st.rerun()
@@ -448,54 +473,47 @@ elif menu == "Insights IA":
     with st.container(border=True):
         st.subheader("1. Defina o Período")
         periodo = st.select_slider("Quanto tempo analisar?", options=["7 Dias", "15 Dias", "30 Dias", "Tudo"])
-        
         dias_map = {"7 Dias": 7, "15 Dias": 15, "30 Dias": 30, "Tudo": 365}
-        dias = dias_map[periodo]
         
-        # Filtrar dados pelo periodo
-        registros_filtrados = list(db["registros"].items())[-dias:]
-        if not registros_filtrados:
-            st.warning("Sem dados suficientes para este período.")
+        # Filtrar dados
+        registros_filtrados = list(db["registros"].items())[-dias_map[periodo]:]
+        if not registros_filtrados: st.warning("Sem dados suficientes.")
         
         st.divider()
         st.subheader("2. Escolha o Tipo de Consultoria")
         
         c_ia1, c_ia2 = st.columns(2)
-        prompt_prefix = ""
+        prompt = ""
         executar = False
         
         if c_ia1.button("📊 Análise Geral"):
-            prompt_prefix = "Aja como um terapeuta de casais. Faça um resumo analítico sobre como foi o relacionamento neste período. Aponte pontos altos e baixos."
+            prompt = "Aja como um terapeuta. Resuma o relacionamento neste período. Pontos altos e baixos."
             executar = True
-            
         if c_ia2.button("⚖️ Coach de Conflitos"):
-            conflitos = [r for d, r in registros_filtrados if r.get('discussao')]
-            registros_filtrados = [(d, r) for d, r in registros_filtrados if r.get('discussao')]
-            prompt_prefix = "Analise apenas os conflitos e discussões que ocorreram. Identifique padrões (ex: financeiro, ciúmes) e sugira uma solução prática."
+            # Filtrar conflitos
+            regs_conf = [(d,r) for d,r in registros_filtrados if r.get('discussao')]
+            prompt = "Analise apenas conflitos. Identifique padrões e dê soluções."
+            registros_filtrados = regs_conf
             executar = True
-            if not conflitos:
-                st.success("Nenhum conflito registrado neste período! 🎉")
-                executar = False
+            if not regs_conf: st.success("Sem conflitos! 🎉"); executing = False
 
         c_ia3, c_ia4 = st.columns(2)
         if c_ia3.button("💘 Guru Romântico"):
-            prompt_prefix = "Sugira 3 ideias criativas de encontros ou gestos para a próxima semana."
+            prompt = "Sugira 3 ideias criativas de encontros baseadas no perfil do casal."
             executar = True
-        if c_ia4.button("🔮 Previsão de Tendência"):
-            prompt_prefix = "Analise a tendência das notas e do humor. O relacionamento está em ascensão ou declínio?"
+        if c_ia4.button("🔮 Tendências"):
+            prompt = "Analise matematicamente a tendência das notas. Ascensão ou declínio?"
             executar = True
 
         if executar and registros_filtrados:
             ctx = str(registros_filtrados)
             if len(ctx) > 15000: ctx = ctx[-15000:]
             try:
-                with st.spinner("Consultando o Mentor IA..."):
-                    prompt_final = f"{prompt_prefix} Dados do Casal (Jhonata e Katheryn): {ctx}"
+                with st.spinner("Analisando..."):
                     resp = client_groq.chat.completions.create(
                         model=db["config"]["modelo_ia"], 
-                        messages=[{"role":"user","content":prompt_final}],
+                        messages=[{"role":"user","content":f"{prompt} Dados: {ctx}"}],
                         temperature=0.7
                     )
                     st.success(resp.choices[0].message.content)
-            except Exception as e:
-                st.error(f"Erro na IA: {e}")
+            except Exception as e: st.error(f"Erro: {e}")
