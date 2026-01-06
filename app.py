@@ -9,66 +9,10 @@ from groq import Groq
 from fpdf import FPDF
 from PIL import Image
 
-# --- CONFIGURAÇÃO DA PÁGINA ---
+# --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="Love Planner 2026", layout="centered", page_icon="❤️")
 
-# --- ESTILIZAÇÃO CSS (Ajustada para focar em cores e fontes, sem quebrar layout) ---
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap');
-
-    :root {
-        --primary: #f42536;
-        --bg-light: #fcf8f8;
-    }
-
-    html, body, [class*="css"] {
-        font-family: 'Plus Jakarta Sans', sans-serif;
-    }
-    
-    .stApp {
-        background-color: var(--bg-light);
-    }
-
-    /* Botões Personalizados */
-    div.stButton > button {
-        background-color: var(--primary);
-        color: white;
-        border-radius: 12px;
-        border: none;
-        padding: 12px 24px;
-        font-weight: 700;
-        width: 100%;
-        transition: all 0.2s;
-    }
-    div.stButton > button:hover {
-        background-color: #d11a2a;
-        color: white;
-        transform: scale(1.01);
-    }
-    
-    /* Botão de Excluir */
-    div.stButton > button.delete-btn { background-color: #ef4444; }
-
-    /* Card de XP (Gamificação) */
-    .xp-card {
-        background: linear-gradient(135deg, #f42536 0%, #ff5c6a 100%);
-        color: white;
-        border-radius: 24px;
-        padding: 20px;
-        text-align: center;
-        box-shadow: 0 10px 25px -5px rgba(244, 37, 54, 0.4);
-        margin-bottom: 20px;
-    }
-    .xp-stat { font-size: 3rem; font-weight: 800; line-height: 1; }
-    .xp-label { font-size: 0.9rem; opacity: 0.9; font-weight: 500; }
-    
-    /* Ajuste de Títulos */
-    h1, h2, h3 { color: #1c0d0e; font-weight: 800; }
-</style>
-""", unsafe_allow_html=True)
-
-# --- SEGURANÇA ---
+# --- SEGURANÇA (SECRETS) ---
 try:
     GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
     GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
@@ -77,29 +21,35 @@ except Exception:
     st.error("Erro nos Secrets.")
     st.stop()
 
-# APIs
+# Inicialização de APIs
 client_groq = Groq(api_key=GROQ_API_KEY)
 auth = Auth.Token(GITHUB_TOKEN)
 g = Github(auth=auth)
 repo = g.get_repo(GITHUB_REPO)
 
-# --- DADOS ---
-LINGUAGENS_LISTA = ["Atos de Serviço", "Palavras de Afirmação", "Tempo de Qualidade", "Toque Físico", "Presentes"]
-CATEGORIAS_DR = ["Comunicação", "Finanças", "Ciúmes", "Família", "Rotina", "Outros"]
-
+# --- FUNÇÕES DE DADOS ---
 def load_data():
     try:
         contents = repo.get_contents("data_2026.json")
         data = json.loads(contents.decoded_content.decode())
+        # Garantir chaves essenciais
         if "xp" not in data: data["xp"] = 0
-        if "config" not in data: data["config"] = {"modelo_ia": "llama-3.3-70b-versatile"}
+        if "config" not in data: data["config"] = {"modelo_ia": "llama-3.3-70b-versatile", "tema": "Claro"}
         if "acordos_mestres" not in data: data["acordos_mestres"] = []
         if "metas" not in data: data["metas"] = {"elogios": 3, "qualidade": 2}
         if "configuracoes" not in data:
              data["configuracoes"] = {"opcoes_eu_fiz": ["Elogio", "Tempo de Qualidade"], "opcoes_ela_fez": ["Carinho"]}
+        # Garantir que tema exista
+        if "tema" not in data["config"]: data["config"]["tema"] = "Claro"
         return data
     except:
-        return {"registros": {}, "eventos": {}, "acordos_mestres": [], "xp": 0, "metas": {"elogios": 3, "qualidade": 2}, "configuracoes": {"opcoes_eu_fiz": ["Elogio"], "opcoes_ela_fez": ["Carinho"]}, "config": {"modelo_ia": "llama-3.3-70b-versatile"}}
+        # DB Inicial padrão
+        return {
+            "registros": {}, "eventos": {}, "acordos_mestres": [], "xp": 0,
+            "metas": {"elogios": 3, "qualidade": 2},
+            "configuracoes": {"opcoes_eu_fiz": ["Elogio"], "opcoes_ela_fez": ["Carinho"]},
+            "config": {"modelo_ia": "llama-3.3-70b-versatile", "tema": "Claro"}
+        }
 
 def save_all(data):
     json_data = json.dumps(data, indent=4, ensure_ascii=False)
@@ -109,7 +59,100 @@ def save_all(data):
     except:
         repo.create_file("data_2026.json", "DB Init", json_data)
 
+# Carregar dados ANTES do CSS para aplicar o tema correto
 db = load_data()
+tema_atual = db["config"].get("tema", "Claro")
+
+# --- DEFINIÇÃO DE CORES POR TEMA ---
+if tema_atual == "Escuro":
+    cor_bg = "#121212"
+    cor_card = "#1e1e1e"
+    cor_texto = "#ffffff"
+    cor_border = "#333333"
+    cor_input_bg = "#2d2d2d"
+else:
+    cor_bg = "#fcf8f8"
+    cor_card = "#ffffff"
+    cor_texto = "#1c0d0e"
+    cor_border = "#e8ced1"
+    cor_input_bg = "#ffffff"
+
+# --- ESTILIZAÇÃO CSS DINÂMICA ---
+st.markdown(f"""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap');
+
+    :root {{
+        --primary: #f42536;
+        --bg-app: {cor_bg};
+        --bg-card: {cor_card};
+        --text-main: {cor_texto};
+        --border-color: {cor_border};
+    }}
+
+    html, body, [class*="css"], .stApp {{
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        background-color: var(--bg-app);
+        color: var(--text-main);
+    }}
+
+    /* Estilo dos Containers (Cards Nativos) */
+    [data-testid="stVerticalBlockBorderWrapper"] > div {{
+        background-color: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 24px;
+        box-shadow: 0 4px 20px -2px rgba(244, 37, 54, 0.05);
+    }}
+
+    /* Botões */
+    div.stButton > button {{
+        background-color: var(--primary);
+        color: white;
+        border-radius: 12px;
+        border: none;
+        padding: 12px 24px;
+        font-weight: 700;
+        width: 100%;
+        transition: all 0.2s;
+    }}
+    div.stButton > button:hover {{
+        background-color: #d11a2a;
+        color: white;
+        transform: scale(1.01);
+    }}
+    
+    /* Inputs */
+    .stTextInput > div > div > input {{
+        background-color: {cor_input_bg};
+        color: var(--text-main);
+        border-radius: 12px;
+    }}
+    .stSelectbox > div > div {{
+        background-color: {cor_input_bg};
+        color: var(--text-main);
+        border-radius: 12px;
+    }}
+
+    /* Card de XP (Gamificação) */
+    .xp-card {{
+        background: linear-gradient(135deg, #f42536 0%, #ff5c6a 100%);
+        color: white;
+        border-radius: 24px;
+        padding: 20px;
+        text-align: center;
+        box-shadow: 0 10px 25px -5px rgba(244, 37, 54, 0.4);
+        margin-bottom: 20px;
+    }}
+    .xp-stat {{ font-size: 3rem; font-weight: 800; line-height: 1; }}
+    
+    /* Textos */
+    h1, h2, h3, p, label {{ color: var(--text-main) !important; }}
+</style>
+""", unsafe_allow_html=True)
+
+# --- DADOS CONSTANTES ---
+LINGUAGENS_LISTA = ["Atos de Serviço", "Palavras de Afirmação", "Tempo de Qualidade", "Toque Físico", "Presentes"]
+CATEGORIAS_DR = ["Comunicação", "Finanças", "Ciúmes", "Família", "Rotina", "Outros"]
 
 # --- HELPER GAMIFICAÇÃO ---
 def get_nivel_info(xp):
@@ -187,13 +230,15 @@ if menu == "Dashboard":
             ds = d.strftime("%Y-%m-%d")
             reg = db["registros"].get(ds, {})
             c = "#ebedf0"
+            if tema_atual == "Escuro": c = "#333333" # Grid mais escuro no tema escuro
+            
             if ds in db["registros"]:
                 if metric == "nota":
                     n = reg.get("nota", 0)
                     c = "#216e39" if n >= 8 else "#f9d71c" if n >= 5 else "#f44336"
                 elif metric in LINGUAGENS_LISTA:
-                    c = color if metric in reg.get("ling_eu", []) or metric in reg.get("ling_ela", []) else "#ebedf0"
-                else: c = color if reg.get(metric) else "#ebedf0"
+                    c = color if metric in reg.get("ling_eu", []) or metric in reg.get("ling_ela", []) else c
+                else: c = color if reg.get(metric) else c
             grid += f'<div title="{ds}" style="width: 10px; height: 10px; background-color: {c}; border-radius: 2px;"></div>'
         st.markdown(grid + '</div>', unsafe_allow_html=True)
 
@@ -202,7 +247,7 @@ if menu == "Dashboard":
 
 # --- 2. REGISTRAR DIA ---
 elif menu == "Registrar Dia":
-    with st.container(border=True): # O CARD AGORA É NATIVO DO STREAMLIT
+    with st.container(border=True):
         st.markdown("## 📝 Registrar Dia")
         
         selected_date = st.date_input("Data:", date.today())
@@ -307,47 +352,82 @@ elif menu == "Cápsula":
                 else:
                     st.warning("Sem dados.")
 
-# --- 5. CONFIGURAÇÕES ---
+# --- 5. CONFIGURAÇÕES (RESTAURADO + TEMA) ---
 elif menu == "Configurações":
-    st.markdown("## ⚙️ Ajustes")
+    st.markdown("## ⚙️ Configurações")
+    
+    # SELETOR DE TEMA
+    with st.container(border=True):
+        st.markdown("### 🎨 Aparência")
+        novo_tema = st.radio("Tema do App:", ["Claro", "Escuro"], index=0 if tema_atual == "Claro" else 1, horizontal=True)
+        if novo_tema != tema_atual:
+            db["config"]["tema"] = novo_tema
+            save_all(db)
+            st.rerun()
     
     c1, c2 = st.columns(2)
     with c1:
         with st.container(border=True):
-            st.markdown("### Gerenciar 'Eu Fiz'")
-            new_eu = st.text_input("Novo:", key="new_eu")
-            if st.button("Adicionar (Eu)"):
+            st.markdown("### 'Eu Fiz' (Jhonata)")
+            
+            # Adicionar
+            new_eu = st.text_input("Adicionar novo item:", key="new_eu")
+            if st.button("Adicionar", key="btn_add_eu"):
                 if new_eu and new_eu not in db["configuracoes"]["opcoes_eu_fiz"]:
                     db["configuracoes"]["opcoes_eu_fiz"].append(new_eu)
                     save_all(db); st.rerun()
             
             st.divider()
+            
+            # Renomear/Excluir (RESTAURADO)
             opts_eu = db["configuracoes"]["opcoes_eu_fiz"]
             if opts_eu:
-                sel_eu = st.selectbox("Selecione:", opts_eu, key="sel_eu")
-                if st.button("Excluir", key="del_eu"):
+                sel_eu = st.selectbox("Editar item:", opts_eu, key="sel_eu")
+                rename_eu = st.text_input("Renomear para:", value=sel_eu, key="ren_eu")
+                
+                col_e1, col_e2 = st.columns(2)
+                if col_e1.button("Salvar Nome", key="save_ren_eu"):
+                    if rename_eu:
+                        idx = opts_eu.index(sel_eu)
+                        db["configuracoes"]["opcoes_eu_fiz"][idx] = rename_eu
+                        save_all(db); st.rerun()
+                
+                if col_e2.button("Excluir", key="del_eu"):
                     db["configuracoes"]["opcoes_eu_fiz"].remove(sel_eu)
                     save_all(db); st.rerun()
 
     with c2:
         with st.container(border=True):
-            st.markdown("### Gerenciar 'Ela Fez'")
-            new_ela = st.text_input("Novo:", key="new_ela")
-            if st.button("Adicionar (Ela)"):
+            st.markdown("### 'Ela Fez' (Katheryn)")
+            
+            # Adicionar
+            new_ela = st.text_input("Adicionar novo item:", key="new_ela")
+            if st.button("Adicionar", key="btn_add_ela"):
                 if new_ela and new_ela not in db["configuracoes"]["opcoes_ela_fez"]:
                     db["configuracoes"]["opcoes_ela_fez"].append(new_ela)
                     save_all(db); st.rerun()
             
             st.divider()
+            
+            # Renomear/Excluir (RESTAURADO)
             opts_ela = db["configuracoes"]["opcoes_ela_fez"]
             if opts_ela:
-                sel_ela = st.selectbox("Selecione:", opts_ela, key="sel_ela")
-                if st.button("Excluir", key="del_ela"):
+                sel_ela = st.selectbox("Editar item:", opts_ela, key="sel_ela")
+                rename_ela = st.text_input("Renomear para:", value=sel_ela, key="ren_ela")
+                
+                col_e3, col_e4 = st.columns(2)
+                if col_e3.button("Salvar Nome", key="save_ren_ela"):
+                    if rename_ela:
+                        idx = opts_ela.index(sel_ela)
+                        db["configuracoes"]["opcoes_ela_fez"][idx] = rename_ela
+                        save_all(db); st.rerun()
+                
+                if col_e4.button("Excluir", key="del_ela"):
                     db["configuracoes"]["opcoes_ela_fez"].remove(sel_ela)
                     save_all(db); st.rerun()
 
     with st.container(border=True):
-        if st.button("Limpar Cache (Se der erro visual)"):
+        if st.button("Limpar Cache (Debug)"):
              st.cache_data.clear()
 
 # --- 6. INSIGHTS IA ---
@@ -358,7 +438,7 @@ elif menu == "Insights IA":
             ctx = str(list(db["registros"].items())[-7:])
             try:
                 prompt = f"Seja um mentor amoroso. Analise: {ctx}. Dê conselhos."
-                resp = client_groq.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role":"user","content":prompt}])
+                resp = client_groq.chat.completions.create(model=db["config"]["modelo_ia"], messages=[{"role":"user","content":prompt}])
                 st.success(resp.choices[0].message.content)
             except Exception as e:
                 st.error(f"Erro: {e}")
