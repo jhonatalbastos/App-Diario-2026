@@ -104,7 +104,14 @@
     "eventos": {
         "2026-04-22": "Aniversário de Namoro"
     },
-    "acordos_mestres": [],
+    "acordos_mestres": [
+        {
+            "titulo": "Não usar telefone no jantar",
+            "nome_curto": "Não usar t",
+            "monitorar": true,
+            "data": "2026-01-06"
+        }
+    ],
     "configuracoes": {
         "opcoes_eu_fiz": [
             "Flores",
