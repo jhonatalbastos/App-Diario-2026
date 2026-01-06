@@ -39,11 +39,9 @@ def load_data():
         if "metas" not in data: data["metas"] = {"elogios": 3, "qualidade": 2}
         if "configuracoes" not in data:
              data["configuracoes"] = {"opcoes_eu_fiz": ["Elogio", "Tempo de Qualidade"], "opcoes_ela_fez": ["Carinho"]}
-        # Garantir que tema exista
         if "tema" not in data["config"]: data["config"]["tema"] = "Claro"
         return data
     except:
-        # DB Inicial padrão
         return {
             "registros": {}, "eventos": {}, "acordos_mestres": [], "xp": 0,
             "metas": {"elogios": 3, "qualidade": 2},
@@ -59,7 +57,7 @@ def save_all(data):
     except:
         repo.create_file("data_2026.json", "DB Init", json_data)
 
-# Carregar dados ANTES do CSS para aplicar o tema correto
+# Carregar dados
 db = load_data()
 tema_atual = db["config"].get("tema", "Claro")
 
@@ -96,7 +94,6 @@ st.markdown(f"""
         color: var(--text-main);
     }}
 
-    /* Estilo dos Containers (Cards Nativos) */
     [data-testid="stVerticalBlockBorderWrapper"] > div {{
         background-color: var(--bg-card);
         border: 1px solid var(--border-color);
@@ -104,7 +101,6 @@ st.markdown(f"""
         box-shadow: 0 4px 20px -2px rgba(244, 37, 54, 0.05);
     }}
 
-    /* Botões */
     div.stButton > button {{
         background-color: var(--primary);
         color: white;
@@ -121,19 +117,12 @@ st.markdown(f"""
         transform: scale(1.01);
     }}
     
-    /* Inputs */
-    .stTextInput > div > div > input {{
-        background-color: {cor_input_bg};
-        color: var(--text-main);
-        border-radius: 12px;
-    }}
-    .stSelectbox > div > div {{
+    .stTextInput > div > div > input, .stSelectbox > div > div {{
         background-color: {cor_input_bg};
         color: var(--text-main);
         border-radius: 12px;
     }}
 
-    /* Card de XP (Gamificação) */
     .xp-card {{
         background: linear-gradient(135deg, #f42536 0%, #ff5c6a 100%);
         color: white;
@@ -145,7 +134,6 @@ st.markdown(f"""
     }}
     .xp-stat {{ font-size: 3rem; font-weight: 800; line-height: 1; }}
     
-    /* Textos */
     h1, h2, h3, p, label {{ color: var(--text-main) !important; }}
 </style>
 """, unsafe_allow_html=True)
@@ -230,7 +218,7 @@ if menu == "Dashboard":
             ds = d.strftime("%Y-%m-%d")
             reg = db["registros"].get(ds, {})
             c = "#ebedf0"
-            if tema_atual == "Escuro": c = "#333333" # Grid mais escuro no tema escuro
+            if tema_atual == "Escuro": c = "#333333"
             
             if ds in db["registros"]:
                 if metric == "nota":
@@ -352,11 +340,10 @@ elif menu == "Cápsula":
                 else:
                     st.warning("Sem dados.")
 
-# --- 5. CONFIGURAÇÕES (RESTAURADO + TEMA) ---
+# --- 5. CONFIGURAÇÕES ---
 elif menu == "Configurações":
     st.markdown("## ⚙️ Configurações")
     
-    # SELETOR DE TEMA
     with st.container(border=True):
         st.markdown("### 🎨 Aparência")
         novo_tema = st.radio("Tema do App:", ["Claro", "Escuro"], index=0 if tema_atual == "Claro" else 1, horizontal=True)
@@ -369,76 +356,110 @@ elif menu == "Configurações":
     with c1:
         with st.container(border=True):
             st.markdown("### 'Eu Fiz' (Jhonata)")
-            
-            # Adicionar
-            new_eu = st.text_input("Adicionar novo item:", key="new_eu")
-            if st.button("Adicionar", key="btn_add_eu"):
+            new_eu = st.text_input("Novo:", key="new_eu")
+            if st.button("Adicionar (Eu)"):
                 if new_eu and new_eu not in db["configuracoes"]["opcoes_eu_fiz"]:
                     db["configuracoes"]["opcoes_eu_fiz"].append(new_eu)
                     save_all(db); st.rerun()
-            
             st.divider()
-            
-            # Renomear/Excluir (RESTAURADO)
             opts_eu = db["configuracoes"]["opcoes_eu_fiz"]
             if opts_eu:
                 sel_eu = st.selectbox("Editar item:", opts_eu, key="sel_eu")
                 rename_eu = st.text_input("Renomear para:", value=sel_eu, key="ren_eu")
-                
-                col_e1, col_e2 = st.columns(2)
-                if col_e1.button("Salvar Nome", key="save_ren_eu"):
-                    if rename_eu:
-                        idx = opts_eu.index(sel_eu)
-                        db["configuracoes"]["opcoes_eu_fiz"][idx] = rename_eu
-                        save_all(db); st.rerun()
-                
-                if col_e2.button("Excluir", key="del_eu"):
+                ce1, ce2 = st.columns(2)
+                if ce1.button("Salvar Nome", key="sn_eu"):
+                    idx = opts_eu.index(sel_eu)
+                    db["configuracoes"]["opcoes_eu_fiz"][idx] = rename_eu
+                    save_all(db); st.rerun()
+                if ce2.button("Excluir", key="del_eu"):
                     db["configuracoes"]["opcoes_eu_fiz"].remove(sel_eu)
                     save_all(db); st.rerun()
 
     with c2:
         with st.container(border=True):
             st.markdown("### 'Ela Fez' (Katheryn)")
-            
-            # Adicionar
-            new_ela = st.text_input("Adicionar novo item:", key="new_ela")
-            if st.button("Adicionar", key="btn_add_ela"):
+            new_ela = st.text_input("Novo:", key="new_ela")
+            if st.button("Adicionar (Ela)"):
                 if new_ela and new_ela not in db["configuracoes"]["opcoes_ela_fez"]:
                     db["configuracoes"]["opcoes_ela_fez"].append(new_ela)
                     save_all(db); st.rerun()
-            
             st.divider()
-            
-            # Renomear/Excluir (RESTAURADO)
             opts_ela = db["configuracoes"]["opcoes_ela_fez"]
             if opts_ela:
                 sel_ela = st.selectbox("Editar item:", opts_ela, key="sel_ela")
                 rename_ela = st.text_input("Renomear para:", value=sel_ela, key="ren_ela")
-                
-                col_e3, col_e4 = st.columns(2)
-                if col_e3.button("Salvar Nome", key="save_ren_ela"):
-                    if rename_ela:
-                        idx = opts_ela.index(sel_ela)
-                        db["configuracoes"]["opcoes_ela_fez"][idx] = rename_ela
-                        save_all(db); st.rerun()
-                
-                if col_e4.button("Excluir", key="del_ela"):
+                ce3, ce4 = st.columns(2)
+                if ce3.button("Salvar Nome", key="sn_ela"):
+                    idx = opts_ela.index(sel_ela)
+                    db["configuracoes"]["opcoes_ela_fez"][idx] = rename_ela
+                    save_all(db); st.rerun()
+                if ce4.button("Excluir", key="del_ela"):
                     db["configuracoes"]["opcoes_ela_fez"].remove(sel_ela)
                     save_all(db); st.rerun()
 
-    with st.container(border=True):
-        if st.button("Limpar Cache (Debug)"):
-             st.cache_data.clear()
-
-# --- 6. INSIGHTS IA ---
+# --- 6. INSIGHTS IA (MODO AVANÇADO) ---
 elif menu == "Insights IA":
-    st.header("💡 Mentor IA")
+    st.header("💡 Mentor de Relacionamento")
+    
     with st.container(border=True):
-        if st.button("Analisar Semana"):
-            ctx = str(list(db["registros"].items())[-7:])
+        st.subheader("1. Defina o Período")
+        periodo = st.select_slider("Quanto tempo analisar?", options=["7 Dias", "15 Dias", "30 Dias", "Tudo"])
+        
+        dias_map = {"7 Dias": 7, "15 Dias": 15, "30 Dias": 30, "Tudo": 365}
+        dias = dias_map[periodo]
+        
+        # Filtrar dados pelo periodo
+        registros_filtrados = list(db["registros"].items())[-dias:]
+        if not registros_filtrados:
+            st.warning("Sem dados suficientes para este período.")
+        
+        st.divider()
+        st.subheader("2. Escolha o Tipo de Consultoria")
+        
+        c_ia1, c_ia2 = st.columns(2)
+        
+        prompt_prefix = ""
+        executar = False
+        
+        # Botões de Ação Diferentes
+        if c_ia1.button("📊 Análise Geral"):
+            prompt_prefix = "Aja como um terapeuta de casais. Faça um resumo analítico sobre como foi o relacionamento neste período. Aponte pontos altos e baixos."
+            executar = True
+            
+        if c_ia2.button("⚖️ Coach de Conflitos"):
+            # Filtrar apenas dias com conflito para este prompt
+            conflitos = [r for d, r in registros_filtrados if r.get('discussao')]
+            registros_filtrados = [(d, r) for d, r in registros_filtrados if r.get('discussao')]
+            prompt_prefix = "Analise apenas os conflitos e discussões que ocorreram. Identifique padrões (ex: financeiro, ciúmes) e sugira uma solução prática e empática para evitar que se repitam."
+            executar = True
+            if not conflitos:
+                st.success("Nenhum conflito registrado neste período! 🎉")
+                executar = False
+
+        c_ia3, c_ia4 = st.columns(2)
+        
+        if c_ia3.button("💘 Guru Romântico"):
+            prompt_prefix = "Baseado no que o casal já fez (linguagens do amor usadas), sugira 3 ideias criativas e inéditas de encontros ou gestos para a próxima semana que se alinhem com o perfil deles."
+            executar = True
+            
+        if c_ia4.button("🔮 Previsão de Tendência"):
+            prompt_prefix = "Analise a tendência das notas e do humor. O relacionamento está em ascensão, estável ou declínio? Dê um alerta ou um parabéns baseado na tendência matemática."
+            executar = True
+
+        # Execução da IA
+        if executar and registros_filtrados:
+            ctx = str(registros_filtrados)
+            # Limitar tamanho para economizar tokens se for "Tudo"
+            if len(ctx) > 15000: ctx = ctx[-15000:]
+            
             try:
-                prompt = f"Seja um mentor amoroso. Analise: {ctx}. Dê conselhos."
-                resp = client_groq.chat.completions.create(model=db["config"]["modelo_ia"], messages=[{"role":"user","content":prompt}])
-                st.success(resp.choices[0].message.content)
+                with st.spinner("Consultando o Mentor IA..."):
+                    prompt_final = f"{prompt_prefix} Dados do Casal (Jhonata e Katheryn): {ctx}"
+                    resp = client_groq.chat.completions.create(
+                        model=db["config"]["modelo_ia"], 
+                        messages=[{"role":"user","content":prompt_final}],
+                        temperature=0.7
+                    )
+                    st.success(resp.choices[0].message.content)
             except Exception as e:
-                st.error(f"Erro: {e}")
+                st.error(f"Erro na IA: {e}")
