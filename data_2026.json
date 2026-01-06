@@ -85,11 +85,20 @@
                 "Cuidado",
                 "Beijos"
             ],
+            "ling_eu": [
+                "Palavras de Afirmação",
+                "Toque Físico"
+            ],
+            "ling_ela": [
+                "Tempo de Qualidade",
+                "Palavras de Afirmação"
+            ],
             "discussao": false,
             "cat_dr": null,
             "sexo": true,
             "resumo": "Conversamos sobre uma mensagem que minha filha mandou no meu telefone perguntando entre outras coisas porque eu estou sendo ruim com ela. Minha filha não entender (ou se faz de sonsa) que as atitudes dela contra minha mulher e contra mim tem consequências. Depois jogamos varias partidas de dama e ela me ganhou varias vezes, 5x3. Jantamos, fizemos amor e fomos dormir agarrados. ",
-            "locked": false
+            "whatsapp_txt": "",
+            "locked": true
         }
     },
     "eventos": {
@@ -111,7 +120,7 @@
             "Beijos"
         ]
     },
-    "xp": 30,
+    "xp": 35,
     "config": {
         "modelo_ia": "llama-3.3-70b-versatile"
     },
