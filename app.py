@@ -192,6 +192,29 @@ st.markdown(f"""
         display: inline-block; margin-bottom: 8px; text-transform: uppercase;
     }}
     
+    /* ACORDOS CARD STYLE */
+    .agreement-card {{
+        display: flex;
+        align-items: flex-start;
+        gap: 15px;
+        padding: 15px;
+        border-bottom: 1px solid {paleta['border']};
+        margin-bottom: 10px;
+    }}
+    .agreement-icon {{
+        width: 40px; height: 40px; border-radius: 12px;
+        background: {paleta['primary']}15;
+        color: {paleta['primary']};
+        display: flex; align-items: center; justify-content: center;
+        font-size: 20px; flex-shrink: 0;
+    }}
+    .agreement-tag {{
+        font-size: 0.65rem; padding: 2px 8px; border-radius: 8px;
+        font-weight: 700; text-transform: uppercase;
+        background: {paleta['input_bg']}; color: {paleta['text_muted']};
+        margin-left: auto;
+    }}
+    
     .material-icons {{ font-family: 'Material Symbols Outlined'; font-size: 20px; vertical-align: middle; margin-right: 8px; }}
 </style>
 """, unsafe_allow_html=True)
@@ -199,6 +222,8 @@ st.markdown(f"""
 # --- DADOS CONSTANTES ---
 LINGUAGENS_LISTA = ["Atos de Serviço", "Palavras de Afirmação", "Tempo de Qualidade", "Toque Físico", "Presentes"]
 CATEGORIAS_DR = ["Comunicação", "Finanças", "Ciúmes", "Família", "Rotina", "Outros"]
+ICONES_ACORDOS = ["❤️", "🤝", "💰", "🏠", "📅", "🔥", "🙏", "✈️", "🥗", "💪", "🐶", "👶", "🚫", "🍷", "🎮"]
+FREQ_ACORDOS = ["Diário", "Semanal", "Mensal", "Anual", "Único", "Sem Data"]
 
 # --- LÓGICA GAMIFICAÇÃO ---
 def calcular_gamificacao(db):
@@ -209,6 +234,19 @@ def calcular_gamificacao(db):
     try: dias = (date.today() - datetime.strptime(db["config"].get("data_inicio", "2026-01-01"), "%Y-%m-%d").date()).days
     except: dias = 0
     return nivel, xp, xp_prox, progresso, dias
+
+# --- CALCULAR CUMPRIMENTO DE ACORDOS ---
+def calcular_stats_acordo(titulo_acordo):
+    total_dias = len(db["registros"])
+    if total_dias == 0: return 0, 0
+    
+    cumpridos = 0
+    for reg in db["registros"].values():
+        checks = reg.get("checks_acordos", {})
+        if checks.get(titulo_acordo):
+            cumpridos += 1
+            
+    return cumpridos, total_dias
 
 # --- MODAL DE MEMÓRIA ---
 @st.dialog("Detalhes da Memória")
@@ -280,7 +318,6 @@ if menu == "Dashboard":
             st.altair_chart(chart, use_container_width=True)
         else: st.info("Registre seu primeiro dia!")
 
-    # --- GRIDS RESTAURADOS (HEATMAPS) ---
     st.markdown("### 🔥 Mapas de Calor")
     def draw_grid(title, metric, color):
         st.caption(title)
@@ -289,9 +326,7 @@ if menu == "Dashboard":
         for d in days:
             ds = d.strftime("%Y-%m-%d")
             reg = db["registros"].get(ds, {})
-            # Cores baseadas no tema
             c = "#e2e8f0" if "Claro" in tema_selecionado else "#333333"
-            
             if ds in db["registros"]:
                 if metric == "nota":
                     n = reg.get("nota", 0)
@@ -320,6 +355,20 @@ elif menu == "Registrar Dia":
             with st.form("form_registro"):
                 st.subheader("Como foi hoje?")
                 nota = st.slider("", 1, 10, value=day_data.get("nota", 8))
+                
+                # Checkbox de Acordos (NOVO)
+                if db["acordos_mestres"]:
+                    st.divider()
+                    st.caption("✅ CUMPRIMENTO DE ACORDOS")
+                    checks_hoje = day_data.get("checks_acordos", {})
+                    cols_ac = st.columns(2)
+                    novos_checks = {}
+                    for i, ac in enumerate(db["acordos_mestres"]):
+                        label = f"{ac.get('icone', '🔹')} {ac['titulo']}"
+                        check = cols_ac[i % 2].checkbox(label, value=checks_hoje.get(ac['titulo'], False))
+                        novos_checks[ac['titulo']] = check
+                    st.divider()
+
                 c1, c2 = st.columns(2)
                 with c1:
                     st.caption("JHONATA (EU)")
@@ -339,35 +388,94 @@ elif menu == "Registrar Dia":
                 if st.form_submit_button("Salvar"):
                     if date_str not in db["registros"]: db["xp"] += 20
                     if gratidao: db["xp"] += 5
+                    
+                    # Salvar Acordos Cumpridos
+                    acordos_cumpridos_count = sum(1 for v in novos_checks.values() if v)
+                    db["xp"] += (acordos_cumpridos_count * 2) # XP por acordo
+
                     db["registros"][date_str] = {
                         "nota": nota, "gratidao": gratidao, "eu_fiz": eu_fiz, "ela_fez": ela_fez,
                         "ling_eu": ling_eu, "ling_ela": ling_ela, "discussao": disc, "cat_dr": cat_dr,
-                        "sexo": sexo == "Sim", "resumo": resumo, "locked": True
+                        "sexo": sexo == "Sim", "resumo": resumo, "checks_acordos": novos_checks, "locked": True
                     }
                     save_all(db); st.balloons(); st.rerun()
 
-# --- 3. METAS E ACORDOS ---
+# --- 3. METAS E ACORDOS (REFORMULADO) ---
 elif menu == "Metas & Acordos":
-    st.header("Metas & Acordos")
-    with st.container(border=True):
-        st.markdown("### 🎯 Metas da Semana")
-        hoje = date.today()
-        inicio_sem = hoje - timedelta(days=hoje.weekday())
-        reg_semana = [db["registros"].get((inicio_sem + timedelta(days=i)).strftime("%Y-%m-%d"), {}) for i in range(7)]
-        c_elogios = sum(1 for r in reg_semana if "Elogio" in str(r.get("eu_fiz", [])))
-        st.write(f"**Elogios** ({c_elogios}/{db['metas']['elogios']})")
-        st.progress(min(c_elogios/db['metas']['elogios'], 1.0))
-
-    with st.container(border=True):
-        st.markdown("### 🤝 Acordos Ativos")
-        for ac in db["acordos_mestres"]:
-            st.markdown(f"- **{ac['nome_curto']}**: {ac['titulo']}")
-        with st.expander("Adicionar Acordo"):
-            with st.form("novo_acordo"):
-                t = st.text_input("Acordo")
-                if st.form_submit_button("Salvar"):
-                    db["acordos_mestres"].append({"titulo": t, "nome_curto": t[:10], "monitorar": True, "data": str(date.today())})
+    st.header("Central de Compromissos")
+    
+    # 1. NOVO ACORDO
+    with st.expander("✨ Criar Novo Acordo", expanded=False):
+        with st.form("form_novo_acordo"):
+            col_icon, col_freq = st.columns([1, 2])
+            icon = col_icon.selectbox("Ícone:", ICONES_ACORDOS)
+            freq = col_freq.selectbox("Frequência:", FREQ_ACORDOS)
+            titulo = st.text_input("Título do Acordo (Ex: Jantar sem celular):")
+            desc = st.text_input("Descrição curta (Opcional):")
+            
+            if st.form_submit_button("Firmar Acordo"):
+                if titulo:
+                    novo = {
+                        "titulo": titulo, "icone": icon, "frequencia": freq, 
+                        "descricao": desc, "data_criacao": str(date.today())
+                    }
+                    db["acordos_mestres"].append(novo)
                     save_all(db); st.rerun()
+                else:
+                    st.error("O título é obrigatório.")
+
+    # 2. LISTA DE ACORDOS (CARDS)
+    st.markdown("### 📜 Acordos Ativos")
+    
+    if not db["acordos_mestres"]:
+        st.info("Nenhum acordo firmado ainda. Que tal criar um?")
+    
+    for i, ac in enumerate(db["acordos_mestres"]):
+        # Compatibilidade com versões antigas
+        icone = ac.get("icone", "🤝")
+        freq = ac.get("frequencia", "Diário")
+        desc = ac.get("descricao", "")
+        
+        # Calcular Estatísticas
+        cumpridos, total = calcular_stats_acordo(ac["titulo"])
+        pct = cumpridos / total if total > 0 else 0
+        
+        with st.container(border=True):
+            col_a, col_b = st.columns([4, 1])
+            with col_a:
+                st.markdown(f"""
+                <div class="agreement-card" style="border-bottom:none; padding:0; margin:0;">
+                    <div class="agreement-icon">{icone}</div>
+                    <div style="flex-grow:1;">
+                        <div style="display:flex; align-items:center; justify-content:space-between;">
+                            <span style="font-weight:800; font-size:1.1rem;">{ac['titulo']}</span>
+                            <span class="agreement-tag">{freq}</span>
+                        </div>
+                        <div style="font-size:0.85rem; color:{paleta['text_muted']}; margin-top:4px;">{desc}</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Barra de Progresso Customizada
+                st.write("")
+                st.progress(pct)
+                st.caption(f"Cumprido {cumpridos} vezes em {total} dias registrados ({int(pct*100)}%)")
+                
+            with col_b:
+                st.write("")
+                if st.button("🗑️", key=f"del_ac_{i}", help="Excluir Acordo"):
+                    db["acordos_mestres"].pop(i)
+                    save_all(db); st.rerun()
+
+    # 3. METAS SEMANAIS (Visual Simples)
+    st.divider()
+    st.markdown("### 🎯 Metas da Semana")
+    hoje = date.today()
+    inicio_sem = hoje - timedelta(days=hoje.weekday())
+    reg_semana = [db["registros"].get((inicio_sem + timedelta(days=i)).strftime("%Y-%m-%d"), {}) for i in range(7)]
+    c_elogios = sum(1 for r in reg_semana if "Elogio" in str(r.get("eu_fiz", [])))
+    st.write(f"**Elogios** ({c_elogios}/{db['metas']['elogios']})")
+    st.progress(min(c_elogios/db['metas']['elogios'], 1.0))
 
 # --- 4. CONQUISTAS ---
 elif menu == "🏆 Conquistas":
@@ -498,29 +606,21 @@ elif menu == "Configurações":
     # 3. GERENCIAR OPÇÕES
     st.markdown("### 🛠️ Personalização do Diário")
     c1, c2 = st.columns(2)
-    
     with c1:
         with st.container(border=True):
             st.markdown("#### 'Eu Fiz' (Jhonata)")
-            
-            # Adicionar
             new_eu = st.text_input("Novo Item:", key="n_eu")
             if st.button("Adicionar (Eu)", key="btn_n_eu"):
                 if new_eu and new_eu not in db["configuracoes"]["opcoes_eu_fiz"]:
                     db["configuracoes"]["opcoes_eu_fiz"].append(new_eu); save_all(db); st.rerun()
-            
             st.divider()
-            
-            # Editar/Excluir
             opts_eu = db["configuracoes"]["opcoes_eu_fiz"]
             if opts_eu:
-                sel_eu = st.selectbox("Selecione para editar:", opts_eu, key="s_eu")
+                sel_eu = st.selectbox("Selecione:", opts_eu, key="s_eu")
                 ren_eu = st.text_input("Renomear:", value=sel_eu, key="r_eu")
-                
                 ce1, ce2 = st.columns(2)
                 if ce1.button("Salvar", key="save_eu"):
-                    idx = opts_eu.index(sel_eu)
-                    db["configuracoes"]["opcoes_eu_fiz"][idx] = ren_eu
+                    db["configuracoes"]["opcoes_eu_fiz"][opts_eu.index(sel_eu)] = ren_eu
                     save_all(db); st.rerun()
                 if ce2.button("Excluir", key="del_eu"):
                     db["configuracoes"]["opcoes_eu_fiz"].remove(sel_eu)
@@ -529,25 +629,18 @@ elif menu == "Configurações":
     with c2:
         with st.container(border=True):
             st.markdown("#### 'Ela Fez' (Katheryn)")
-            
-            # Adicionar
             new_ela = st.text_input("Novo Item:", key="n_ela")
             if st.button("Adicionar (Ela)", key="btn_n_ela"):
                 if new_ela and new_ela not in db["configuracoes"]["opcoes_ela_fez"]:
                     db["configuracoes"]["opcoes_ela_fez"].append(new_ela); save_all(db); st.rerun()
-            
             st.divider()
-            
-            # Editar/Excluir
             opts_ela = db["configuracoes"]["opcoes_ela_fez"]
             if opts_ela:
-                sel_ela = st.selectbox("Selecione para editar:", opts_ela, key="s_ela")
+                sel_ela = st.selectbox("Selecione:", opts_ela, key="s_ela")
                 ren_ela = st.text_input("Renomear:", value=sel_ela, key="r_ela")
-                
                 ce3, ce4 = st.columns(2)
                 if ce3.button("Salvar", key="save_ela"):
-                    idx = opts_ela.index(sel_ela)
-                    db["configuracoes"]["opcoes_ela_fez"][idx] = ren_ela
+                    db["configuracoes"]["opcoes_ela_fez"][opts_ela.index(sel_ela)] = ren_ela
                     save_all(db); st.rerun()
                 if ce4.button("Excluir", key="del_ela"):
                     db["configuracoes"]["opcoes_ela_fez"].remove(sel_ela)
