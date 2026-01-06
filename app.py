@@ -388,7 +388,7 @@ elif menu == "⏳ Cápsula":
                 pdf = gerar_pdf(dados, mes_sel)
                 st.download_button("Download", pdf, "Planner.pdf", "application/pdf")
 
-# --- 6. INSIGHTS IA (RESTAURADO) ---
+# --- 6. INSIGHTS IA ---
 elif menu == "Insights IA":
     st.header("💡 Mentor de Relacionamento")
     
@@ -438,10 +438,11 @@ elif menu == "Insights IA":
                     st.success(resp.choices[0].message.content)
             except Exception as e: st.error(f"Erro: {e}")
 
-# --- 7. CONFIGURAÇÕES ---
+# --- 7. CONFIGURAÇÕES (RESTAURADA E MELHORADA) ---
 elif menu == "Configurações":
     st.markdown("## ⚙️ Configurações & Perfil")
     
+    # 1. PERFIL
     with st.container(border=True):
         col_pic, col_info = st.columns([1, 3])
         with col_pic:
@@ -458,10 +459,10 @@ elif menu == "Configurações":
             if st.button("Salvar Perfil"):
                 db["config"]["nomes_casal"] = novo_nome
                 db["config"]["data_inicio"] = str(nova_data)
-                if uploaded_pic:
-                    db["config"]["foto_perfil"] = base64.b64encode(uploaded_pic.getvalue()).decode()
+                if uploaded_pic: db["config"]["foto_perfil"] = base64.b64encode(uploaded_pic.getvalue()).decode()
                 save_all(db); st.rerun()
 
+    # 2. TEMA
     st.markdown("### 🎨 Aparência")
     cols_tema = st.columns(3)
     for i, tema in enumerate(TEMAS.keys()):
@@ -469,14 +470,73 @@ elif menu == "Configurações":
             if st.button(tema, key=f"btn_tema_{tema}", use_container_width=True):
                 db["config"]["tema"] = tema; save_all(db); st.rerun()
     
-    st.markdown("### 🛠️ Opções")
-    with st.container(border=True):
-        c1, c2 = st.columns(2)
-        with c1:
-            new_eu = st.text_input("Novo 'Eu Fiz':")
-            if st.button("Add Eu") and new_eu: db["configuracoes"]["opcoes_eu_fiz"].append(new_eu); save_all(db); st.rerun()
-        with c2:
-            new_ela = st.text_input("Novo 'Ela Fez':")
-            if st.button("Add Ela") and new_ela: db["configuracoes"]["opcoes_ela_fez"].append(new_ela); save_all(db); st.rerun()
+    # 3. GERENCIAR OPÇÕES (RESTAURADO COM EDIÇÃO E EXCLUSÃO)
+    st.markdown("### 🛠️ Personalização do Diário")
+    c1, c2 = st.columns(2)
     
-    if st.button("Sair da Conta (Limpar Cache)"): st.cache_data.clear(); st.rerun()
+    with c1:
+        with st.container(border=True):
+            st.markdown("#### 'Eu Fiz' (Jhonata)")
+            
+            # Adicionar
+            new_eu = st.text_input("Novo Item:", key="n_eu")
+            if st.button("Adicionar (Eu)", key="btn_n_eu"):
+                if new_eu and new_eu not in db["configuracoes"]["opcoes_eu_fiz"]:
+                    db["configuracoes"]["opcoes_eu_fiz"].append(new_eu); save_all(db); st.rerun()
+            
+            st.divider()
+            
+            # Editar/Excluir
+            opts_eu = db["configuracoes"]["opcoes_eu_fiz"]
+            if opts_eu:
+                sel_eu = st.selectbox("Selecione para editar:", opts_eu, key="s_eu")
+                ren_eu = st.text_input("Renomear:", value=sel_eu, key="r_eu")
+                
+                ce1, ce2 = st.columns(2)
+                if ce1.button("Salvar", key="save_eu"):
+                    idx = opts_eu.index(sel_eu)
+                    db["configuracoes"]["opcoes_eu_fiz"][idx] = ren_eu
+                    save_all(db); st.rerun()
+                if ce2.button("Excluir", key="del_eu"):
+                    db["configuracoes"]["opcoes_eu_fiz"].remove(sel_eu)
+                    save_all(db); st.rerun()
+
+    with c2:
+        with st.container(border=True):
+            st.markdown("#### 'Ela Fez' (Katheryn)")
+            
+            # Adicionar
+            new_ela = st.text_input("Novo Item:", key="n_ela")
+            if st.button("Adicionar (Ela)", key="btn_n_ela"):
+                if new_ela and new_ela not in db["configuracoes"]["opcoes_ela_fez"]:
+                    db["configuracoes"]["opcoes_ela_fez"].append(new_ela); save_all(db); st.rerun()
+            
+            st.divider()
+            
+            # Editar/Excluir
+            opts_ela = db["configuracoes"]["opcoes_ela_fez"]
+            if opts_ela:
+                sel_ela = st.selectbox("Selecione para editar:", opts_ela, key="s_ela")
+                ren_ela = st.text_input("Renomear:", value=sel_ela, key="r_ela")
+                
+                ce3, ce4 = st.columns(2)
+                if ce3.button("Salvar", key="save_ela"):
+                    idx = opts_ela.index(sel_ela)
+                    db["configuracoes"]["opcoes_ela_fez"][idx] = ren_ela
+                    save_all(db); st.rerun()
+                if ce4.button("Excluir", key="del_ela"):
+                    db["configuracoes"]["opcoes_ela_fez"].remove(sel_ela)
+                    save_all(db); st.rerun()
+
+    # 4. PREFERÊNCIAS
+    st.markdown("### 🔔 Preferências")
+    with st.container(border=True):
+        notif = st.toggle("Notificações", value=db["config"].get("notificacoes", True))
+        mentor = st.toggle("Dicas do Mentor", value=db["config"].get("dicas_mentor", True))
+        if notif != db["config"].get("notificacoes") or mentor != db["config"].get("dicas_mentor"):
+            db["config"]["notificacoes"] = notif
+            db["config"]["dicas_mentor"] = mentor
+            save_all(db)
+            st.toast("Salvo!")
+    
+    if st.button("Sair (Limpar Cache)"): st.cache_data.clear(); st.rerun()
