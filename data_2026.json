@@ -72,6 +72,24 @@
             "whatsapp_txt": "",
             "checks_acordos": {},
             "locked": true
+        },
+        "2026-01-05": {
+            "nota": 10,
+            "gratidao": "Katheryn entender que eu quis protegê-la no reveilon. ",
+            "eu_fiz": [
+                "Elogios",
+                "Apoio"
+            ],
+            "ela_fez": [
+                "Apoio",
+                "Cuidado",
+                "Beijos"
+            ],
+            "discussao": false,
+            "cat_dr": null,
+            "sexo": true,
+            "resumo": "",
+            "locked": true
         }
     },
     "eventos": {
@@ -92,5 +110,13 @@
             "Cuidado",
             "Beijos"
         ]
+    },
+    "xp": 25,
+    "config": {
+        "modelo_ia": "llama-3.3-70b-versatile"
+    },
+    "metas": {
+        "elogios": 3,
+        "qualidade": 2
     }
 }
