@@ -61,21 +61,27 @@ def save_all(data):
 db = load_data()
 tema_atual = db["config"].get("tema", "Claro")
 
-# --- DEFINIÇÃO DE CORES POR TEMA ---
+# --- DEFINIÇÃO DE CORES POR TEMA (CORREÇÃO VISUAL) ---
 if tema_atual == "Escuro":
-    cor_bg = "#121212"
-    cor_card = "#1e1e1e"
-    cor_texto = "#ffffff"
-    cor_border = "#333333"
-    cor_input_bg = "#2d2d2d"
+    # Paleta Dark Mode
+    cor_bg = "#0e1117"          # Fundo geral do Streamlit Dark
+    cor_sidebar = "#262730"     # Fundo da Sidebar Dark
+    cor_card = "#1e1e1e"        # Fundo dos Cards
+    cor_texto = "#fafafa"       # Texto quase branco
+    cor_texto_sec = "#b0b0b0"   # Texto secundário
+    cor_border = "#333333"      # Bordas sutis
+    cor_input_bg = "#2b2c35"    # Fundo de inputs
 else:
+    # Paleta Light Mode
     cor_bg = "#fcf8f8"
+    cor_sidebar = "#f0f2f6"
     cor_card = "#ffffff"
     cor_texto = "#1c0d0e"
+    cor_texto_sec = "#555555"
     cor_border = "#e8ced1"
     cor_input_bg = "#ffffff"
 
-# --- ESTILIZAÇÃO CSS DINÂMICA ---
+# --- ESTILIZAÇÃO CSS DINÂMICA (CORRIGIDA) ---
 st.markdown(f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap');
@@ -83,27 +89,48 @@ st.markdown(f"""
     :root {{
         --primary: #f42536;
         --bg-app: {cor_bg};
+        --bg-sidebar: {cor_sidebar};
         --bg-card: {cor_card};
         --text-main: {cor_texto};
+        --text-sec: {cor_texto_sec};
         --border-color: {cor_border};
+        --input-bg: {cor_input_bg};
     }}
 
+    /* Fonte Global */
     html, body, [class*="css"], .stApp {{
         font-family: 'Plus Jakarta Sans', sans-serif;
         background-color: var(--bg-app);
         color: var(--text-main);
     }}
 
+    /* CORREÇÃO SIDEBAR: Forçar cores corretas na barra lateral */
+    [data-testid="stSidebar"] {{
+        background-color: var(--bg-sidebar);
+        border-right: 1px solid var(--border-color);
+    }}
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, 
+    [data-testid="stSidebar"] span, [data-testid="stSidebar"] label, [data-testid="stSidebar"] div {{
+        color: var(--text-main) !important;
+    }}
+    /* Cor dos Radio Buttons na Sidebar */
+    [data-testid="stSidebar"] .stRadio label {{
+        color: var(--text-main) !important;
+    }}
+
+    /* Estilo dos Containers (Cards) */
     [data-testid="stVerticalBlockBorderWrapper"] > div {{
         background-color: var(--bg-card);
         border: 1px solid var(--border-color);
         border-radius: 24px;
         box-shadow: 0 4px 20px -2px rgba(244, 37, 54, 0.05);
+        padding: 20px;
     }}
 
+    /* Botões */
     div.stButton > button {{
         background-color: var(--primary);
-        color: white;
+        color: white !important;
         border-radius: 12px;
         border: none;
         padding: 12px 24px;
@@ -113,28 +140,45 @@ st.markdown(f"""
     }}
     div.stButton > button:hover {{
         background-color: #d11a2a;
-        color: white;
         transform: scale(1.01);
     }}
     
-    .stTextInput > div > div > input, .stSelectbox > div > div {{
-        background-color: {cor_input_bg};
-        color: var(--text-main);
+    /* Inputs (Correção para ficarem visíveis no escuro) */
+    .stTextInput input, .stSelectbox div[data-baseweb="select"], .stTextArea textarea, .stDateInput input {{
+        background-color: var(--input-bg) !important;
+        color: var(--text-main) !important;
+        border: 1px solid var(--border-color);
         border-radius: 12px;
     }}
+    
+    /* Sliders */
+    .stSlider [data-baseweb="slider"] {{
+        color: var(--primary);
+    }}
 
+    /* Card de XP (Gamificação) */
     .xp-card {{
         background: linear-gradient(135deg, #f42536 0%, #ff5c6a 100%);
-        color: white;
+        color: white !important;
         border-radius: 24px;
         padding: 20px;
         text-align: center;
         box-shadow: 0 10px 25px -5px rgba(244, 37, 54, 0.4);
         margin-bottom: 20px;
     }}
-    .xp-stat {{ font-size: 3rem; font-weight: 800; line-height: 1; }}
+    .xp-stat {{ font-size: 3rem; font-weight: 800; line-height: 1; color: white !important; }}
+    .xp-label {{ font-size: 0.9rem; opacity: 0.9; font-weight: 500; color: white !important; }}
     
-    h1, h2, h3, p, label {{ color: var(--text-main) !important; }}
+    /* Títulos */
+    h1, h2, h3, h4 {{ color: var(--text-main) !important; }}
+    p, label, span {{ color: var(--text-main); }}
+    .stMarkdown p {{ color: var(--text-main) !important; }}
+    
+    /* Expander */
+    .streamlit-expanderHeader {{
+        background-color: var(--bg-card);
+        color: var(--text-main);
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -397,7 +441,7 @@ elif menu == "Configurações":
                     db["configuracoes"]["opcoes_ela_fez"].remove(sel_ela)
                     save_all(db); st.rerun()
 
-# --- 6. INSIGHTS IA (MODO AVANÇADO) ---
+# --- 6. INSIGHTS IA ---
 elif menu == "Insights IA":
     st.header("💡 Mentor de Relacionamento")
     
@@ -417,41 +461,33 @@ elif menu == "Insights IA":
         st.subheader("2. Escolha o Tipo de Consultoria")
         
         c_ia1, c_ia2 = st.columns(2)
-        
         prompt_prefix = ""
         executar = False
         
-        # Botões de Ação Diferentes
         if c_ia1.button("📊 Análise Geral"):
             prompt_prefix = "Aja como um terapeuta de casais. Faça um resumo analítico sobre como foi o relacionamento neste período. Aponte pontos altos e baixos."
             executar = True
             
         if c_ia2.button("⚖️ Coach de Conflitos"):
-            # Filtrar apenas dias com conflito para este prompt
             conflitos = [r for d, r in registros_filtrados if r.get('discussao')]
             registros_filtrados = [(d, r) for d, r in registros_filtrados if r.get('discussao')]
-            prompt_prefix = "Analise apenas os conflitos e discussões que ocorreram. Identifique padrões (ex: financeiro, ciúmes) e sugira uma solução prática e empática para evitar que se repitam."
+            prompt_prefix = "Analise apenas os conflitos e discussões que ocorreram. Identifique padrões (ex: financeiro, ciúmes) e sugira uma solução prática."
             executar = True
             if not conflitos:
                 st.success("Nenhum conflito registrado neste período! 🎉")
                 executar = False
 
         c_ia3, c_ia4 = st.columns(2)
-        
         if c_ia3.button("💘 Guru Romântico"):
-            prompt_prefix = "Baseado no que o casal já fez (linguagens do amor usadas), sugira 3 ideias criativas e inéditas de encontros ou gestos para a próxima semana que se alinhem com o perfil deles."
+            prompt_prefix = "Sugira 3 ideias criativas de encontros ou gestos para a próxima semana."
             executar = True
-            
         if c_ia4.button("🔮 Previsão de Tendência"):
-            prompt_prefix = "Analise a tendência das notas e do humor. O relacionamento está em ascensão, estável ou declínio? Dê um alerta ou um parabéns baseado na tendência matemática."
+            prompt_prefix = "Analise a tendência das notas e do humor. O relacionamento está em ascensão ou declínio?"
             executar = True
 
-        # Execução da IA
         if executar and registros_filtrados:
             ctx = str(registros_filtrados)
-            # Limitar tamanho para economizar tokens se for "Tudo"
             if len(ctx) > 15000: ctx = ctx[-15000:]
-            
             try:
                 with st.spinner("Consultando o Mentor IA..."):
                     prompt_final = f"{prompt_prefix} Dados do Casal (Jhonata e Katheryn): {ctx}"
