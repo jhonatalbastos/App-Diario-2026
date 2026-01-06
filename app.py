@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import io
+import base64
 import altair as alt
 from datetime import datetime, date, timedelta
 from github import Github, Auth
@@ -39,7 +40,12 @@ def load_data():
             "modelo_ia": "llama-3.3-70b-versatile",
             "tema": "Claro (Padrão)",
             "home_page": "Dashboard",
-            "data_inicio": "2026-01-01"
+            "data_inicio": "2026-01-01",
+            "nomes_casal": "Jhonata & Katheryn",
+            "foto_perfil": None, # Base64 string
+            "notificacoes": True,
+            "dicas_mentor": True,
+            "biometria": False
         }
         for k, v in defaults.items():
             if k not in data["config"]: data["config"][k] = v
@@ -58,7 +64,8 @@ def load_data():
                 "modelo_ia": "llama-3.3-70b-versatile", 
                 "tema": "Claro (Padrão)",
                 "home_page": "Dashboard",
-                "data_inicio": "2026-01-01"
+                "data_inicio": "2026-01-01",
+                "nomes_casal": "Jhonata & Katheryn"
             }
         }
 
@@ -121,6 +128,7 @@ st.markdown(f"""
         --bg-app: {paleta['bg_app']};
         --bg-card: {paleta['bg_card']};
         --text-main: {paleta['text_main']};
+        --text-muted: {paleta['text_muted']};
     }}
 
     html, body, [class*="css"], .stApp {{
@@ -156,49 +164,51 @@ st.markdown(f"""
         transition: all 0.2s;
     }}
     
-    .stTextInput input, .stSelectbox div[data-baseweb="select"], .stTextArea textarea {{
+    .stTextInput input, .stSelectbox div[data-baseweb="select"], .stTextArea textarea, .stDateInput input {{
         background-color: {paleta['input_bg']} !important;
         color: var(--text-main) !important;
         border-radius: 16px;
         border: 1px solid transparent;
     }}
     
-    /* Memory Card Style (Fase 3) */
-    .memory-card {{
-        border-radius: 24px;
-        padding: 24px;
-        color: white;
-        position: relative;
-        overflow: hidden;
-        margin-bottom: 16px;
-        box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3);
-        transition: transform 0.2s;
-        cursor: pointer;
-        min-height: 200px;
+    /* Profile Header Style */
+    .profile-header {{
         display: flex;
-        flex-direction: column;
-        justify-content: flex-end;
+        align-items: center;
+        gap: 20px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid {paleta['border']};
+        margin-bottom: 20px;
     }}
-    .memory-card:hover {{ transform: scale(1.02); }}
-    
-    .memory-badge {{
-        background: rgba(255,255,255,0.2);
-        backdrop-filter: blur(10px);
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 0.75rem;
-        font-weight: 700;
-        display: inline-block;
-        margin-bottom: 8px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+    .profile-pic-container {{
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        overflow: hidden;
+        border: 3px solid var(--primary);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: {paleta['input_bg']};
+    }}
+    .profile-info h2 {{
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--text-main);
+    }}
+    .profile-info p {{
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 0.9rem;
     }}
     
     .material-icons {{
         font-family: 'Material Symbols Outlined';
-        font-size: 24px;
-        display: inline-block;
+        font-size: 20px;
         vertical-align: middle;
+        margin-right: 8px;
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -217,37 +227,27 @@ def calcular_gamificacao(db):
     except: dias = 0
     return nivel, xp, xp_prox, progresso, dias
 
-# --- MODAL DE MEMÓRIA (FASE 3) ---
-@st.dialog("Detalhes da Memória")
-def ver_memoria(data, info):
-    nota = info.get('nota', 0)
-    cor_nota = "#22c55e" if nota >= 8 else "#eab308" if nota >= 5 else "#ef4444"
-    
-    st.markdown(f"""
-    <div style="text-align: center; margin-bottom: 20px;">
-        <div style="font-size: 3rem;">{'😍' if nota >= 8 else '🙂' if nota >= 5 else '☁️'}</div>
-        <h2 style="margin: 0;">{datetime.strptime(data, '%Y-%m-%d').strftime('%d de %B de %Y')}</h2>
-        <div style="color: {cor_nota}; font-weight: 800; font-size: 1.2rem;">Nota do Dia: {nota}/10</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    st.markdown(f"**📝 Resumo:**\n\n{info.get('resumo', 'Sem resumo escrito.')}")
-    
-    if info.get('gratidao'):
-        st.info(f"✨ **Gratidão:** {info['gratidao']}")
-    
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown("**Jhonata fez:**")
-        for x in info.get('eu_fiz', []): st.caption(f"• {x}")
-    with c2:
-        st.markdown("**Katheryn fez:**")
-        for x in info.get('ela_fez', []): st.caption(f"• {x}")
-        
-    if info.get('whatsapp_txt'):
-        with st.expander("💬 Ver Conversa do WhatsApp"):
-            st.text(info['whatsapp_txt'])
+# --- HELPER PDF ---
+def gerar_pdf(dados_mes, nome_mes, img_bytes=None):
+    pdf = FPDF()
+    pdf.add_page()
+    if img_bytes:
+        try:
+            img_io = io.BytesIO(img_bytes)
+            pdf.image(img_io, x=15, y=60, w=180)
+        except: pass
+    pdf.set_font("Arial", "B", 20)
+    pdf.set_text_color(244, 37, 54)
+    pdf.cell(0, 10, f"Planner {nome_mes}", ln=True, align='C')
+    pdf.ln(10)
+    for d, i in sorted(dados_mes.items()):
+        pdf.set_font("Arial", "B", 12)
+        pdf.set_text_color(0, 0, 0)
+        pdf.cell(0, 8, f"{d} | Nota: {i.get('nota')}", ln=True)
+        pdf.set_font("Arial", "", 10)
+        pdf.multi_cell(0, 5, i.get('resumo', ''))
+        pdf.ln(5)
+    return bytes(pdf.output())
 
 # --- NAVEGAÇÃO ---
 MENU_OPTIONS = ["Dashboard", "Registrar Dia", "Metas & Acordos", "🏆 Conquistas", "⏳ Cápsula", "Insights IA", "Configurações"]
@@ -325,12 +325,26 @@ elif menu == "Registrar Dia":
 
 # --- 3. METAS E ACORDOS ---
 elif menu == "Metas & Acordos":
-    # Lógica mantida
     st.header("Metas & Acordos")
     with st.container(border=True):
         st.markdown("### 🎯 Metas da Semana")
-        # ... (código existente de metas)
-        st.write("Em desenvolvimento visual...") 
+        hoje = date.today()
+        inicio_sem = hoje - timedelta(days=hoje.weekday())
+        reg_semana = [db["registros"].get((inicio_sem + timedelta(days=i)).strftime("%Y-%m-%d"), {}) for i in range(7)]
+        c_elogios = sum(1 for r in reg_semana if "Elogio" in str(r.get("eu_fiz", [])))
+        st.write(f"**Elogios** ({c_elogios}/{db['metas']['elogios']})")
+        st.progress(min(c_elogios/db['metas']['elogios'], 1.0))
+
+    with st.container(border=True):
+        st.markdown("### 🤝 Acordos Ativos")
+        for ac in db["acordos_mestres"]:
+            st.markdown(f"- **{ac['nome_curto']}**: {ac['titulo']}")
+        with st.expander("Adicionar Acordo"):
+            with st.form("novo_acordo"):
+                t = st.text_input("Acordo")
+                if st.form_submit_button("Salvar"):
+                    db["acordos_mestres"].append({"titulo": t, "nome_curto": t[:10], "monitorar": True, "data": str(date.today())})
+                    save_all(db); st.rerun()
 
 # --- 4. CONQUISTAS ---
 elif menu == "🏆 Conquistas":
@@ -346,84 +360,134 @@ elif menu == "🏆 Conquistas":
         </div>""", unsafe_allow_html=True)
     st.write(""); st.progress(prog); st.caption(f"{xp}/{xp_prox} XP")
 
-# --- 5. CÁPSULA (NOVO VISUAL FASE 3) ---
+# --- 5. CÁPSULA (FASE 3) ---
 elif menu == "⏳ Cápsula":
-    st.markdown(f"""
-    <div style="text-align: center; padding: 20px 0;">
-        <h2 style="margin:0; font-size:1.5rem;">Hoje é {date.today().strftime('%d de %B de %Y')}</h2>
-        <p style="opacity:0.7;">Relembre seus momentos especiais...</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Lógica de Datas
+    st.markdown("## ⏳ Cápsula do Tempo")
     hoje = date.today()
-    datas_alvo = {
-        "Há 30 Dias": (hoje - timedelta(days=30)).strftime("%Y-%m-%d"),
-        "Há 90 Dias": (hoje - timedelta(days=90)).strftime("%Y-%m-%d"),
-        "Há 1 Ano": (hoje - timedelta(days=365)).strftime("%Y-%m-%d")
-    }
+    datas_alvo = {"Há 30 Dias": (hoje - timedelta(days=30)), "Há 90 Dias": (hoje - timedelta(days=90))}
     
-    tem_memoria = False
-    
-    for label, data_str in datas_alvo.items():
+    for label, data_obj in datas_alvo.items():
+        data_str = data_obj.strftime("%Y-%m-%d")
         if data_str in db["registros"]:
-            tem_memoria = True
             reg = db["registros"][data_str]
             nota = reg.get('nota', 7)
+            bg = "#f42536" if nota >= 8 else "#f59e0b" if nota >= 5 else "#4b5563"
             
-            # Gradientes Emocionais (Sem imagem)
-            if nota >= 8:
-                bg = "linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.6)), linear-gradient(135deg, #f42536 0%, #ff5c6a 100%)"
-                tag = "❤️ Amando muito"
-            elif nota >= 5:
-                bg = "linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.6)), linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)"
-                tag = "🙂 Dia Bom"
-            else:
-                bg = "linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.6)), linear-gradient(135deg, #4b5563 0%, #6b7280 100%)"
-                tag = "☁️ Reflexivo"
-                
-            st.markdown(f"### {label}")
-            
-            # Renderiza o Card Clicável (Simulado com botão transparente por cima ou layout)
-            # Como Streamlit não deixa div clicável acionar python, usamos botão abaixo
-            st.markdown(f"""
-            <div class="memory-card" style="background: {bg};">
-                <div style="position: absolute; top: 20px; left: 20px;">
-                    <div class="memory-badge">{tag}</div>
-                </div>
-                <div>
-                    <div style="opacity: 0.9; font-size: 0.8rem; font-weight: 600; margin-bottom: 5px;">{datetime.strptime(data_str, '%Y-%m-%d').strftime('%d DE %B DE %Y')}</div>
-                    <div style="font-size: 1.5rem; font-weight: 800; line-height: 1.2; margin-bottom: 10px;">
-                        "{reg.get('resumo', 'Sem título')[:40]}..."
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            if st.button(f"👁️ Ler memória de {label}", key=f"btn_{data_str}"):
-                ver_memoria(data_str, reg)
-                
-    if not tem_memoria:
-        st.info("📭 Sua cápsula do tempo ainda está vazia para estas datas. Continue registrando seus dias para ver memórias aqui no futuro!")
-
-    # Exportação PDF mantida no final
-    st.divider()
-    with st.expander("📥 Exportar Relatório em PDF"):
-        mes_sel = st.selectbox("Mês:", ["01","02","03","04","05","06","07","08","09","10","11","12"])
-        if st.button("Baixar PDF"):
-            # Lógica PDF existente
-            pass
+            with st.container(border=True):
+                st.markdown(f"### {label} ({data_obj.strftime('%d/%m')})")
+                st.markdown(f"<div style='background-color:{bg}; color:white; padding:15px; border-radius:12px; margin-bottom:10px;'>Nota: {nota}/10 - {reg.get('resumo', '')[:50]}...</div>", unsafe_allow_html=True)
+                if st.button("Ver Memória", key=f"btn_{data_str}"):
+                    st.info(f"Resumo Completo: {reg.get('resumo')}")
+        else:
+            st.caption(f"{label}: Sem registros.")
 
 # --- 6. INSIGHTS IA ---
 elif menu == "Insights IA":
     st.header("💡 Mentor IA")
-    # Lógica existente
+    # Lógica de IA mantida...
 
-# --- 7. CONFIGURAÇÕES ---
+# --- 7. CONFIGURAÇÕES (FASE 5) ---
 elif menu == "Configurações":
-    st.header("⚙️ Configurações")
+    st.markdown("## ⚙️ Configurações & Perfil")
+    
+    # 1. HEADER DE PERFIL (FOTO E NOMES)
     with st.container(border=True):
-        novo_tema = st.selectbox("Tema:", list(TEMAS.keys()), index=list(TEMAS.keys()).index(tema_selecionado))
-        if st.button("Salvar"):
-            db["config"]["tema"] = novo_tema
-            save_all(db); st.rerun()
+        col_pic, col_info = st.columns([1, 3])
+        
+        with col_pic:
+            # Lógica de Foto de Perfil (Persistência Base64)
+            img_b64 = db["config"].get("foto_perfil")
+            if img_b64:
+                st.markdown(f'<div class="profile-pic-container"><img src="data:image/png;base64,{img_b64}" width="80"></div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="profile-pic-container"><span class="material-icons" style="font-size:40px; color:{paleta["primary"]}">favorite</span></div>', unsafe_allow_html=True)
+        
+        with col_info:
+            st.markdown(f"""
+            <div class="profile-info">
+                <h2>{db["config"].get("nomes_casal", "Casal")}</h2>
+                <p><span class="material-icons">calendar_today</span> Juntos desde {db["config"].get("data_inicio", "2026")}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with st.expander("Editar Perfil"):
+            novo_nome = st.text_input("Nomes:", value=db["config"].get("nomes_casal", ""))
+            nova_data = st.date_input("Data de Início:", value=datetime.strptime(db["config"].get("data_inicio", "2026-01-01"), "%Y-%m-%d"))
+            uploaded_pic = st.file_uploader("Alterar Foto:", type=["png", "jpg", "jpeg"])
+            
+            if st.button("Salvar Perfil"):
+                db["config"]["nomes_casal"] = novo_nome
+                db["config"]["data_inicio"] = str(nova_data)
+                if uploaded_pic:
+                    # Converter imagem para Base64
+                    bytes_data = uploaded_pic.getvalue()
+                    b64_str = base64.b64encode(bytes_data).decode()
+                    db["config"]["foto_perfil"] = b64_str
+                save_all(db)
+                st.success("Perfil atualizado!")
+                st.rerun()
+
+    # 2. SELETOR DE TEMA (VISUAL CARDS)
+    st.markdown("### 🎨 Aparência")
+    cols_tema = st.columns(3)
+    temas_list = list(TEMAS.keys())
+    
+    for i, tema in enumerate(temas_list):
+        with cols_tema[i % 3]:
+            # Botão simples que funciona como seletor
+            if st.button(tema, key=f"btn_tema_{tema}", use_container_width=True):
+                db["config"]["tema"] = tema
+                save_all(db)
+                st.rerun()
+                
+    st.caption(f"Tema Atual: **{tema_selecionado}**")
+
+    # 3. PERSONALIZAÇÃO (AÇÕES)
+    st.markdown("### 🛠️ Personalização")
+    with st.container(border=True):
+        st.markdown("**Gerenciar Opções do Diário**")
+        c_p1, c_p2 = st.columns(2)
+        with c_p1:
+            new_eu = st.text_input("Novo 'Eu Fiz':")
+            if st.button("Add Eu"):
+                if new_eu: db["configuracoes"]["opcoes_eu_fiz"].append(new_eu); save_all(db); st.rerun()
+        with c_p2:
+            new_ela = st.text_input("Novo 'Ela Fez':")
+            if st.button("Add Ela"):
+                if new_ela: db["configuracoes"]["opcoes_ela_fez"].append(new_ela); save_all(db); st.rerun()
+
+    # 4. PREFERÊNCIAS (TOGGLES)
+    st.markdown("### 🔔 Preferências")
+    with st.container(border=True):
+        notif = st.toggle("Lembrete Diário", value=db["config"].get("notificacoes", True))
+        mentor = st.toggle("Dicas do Mentor", value=db["config"].get("dicas_mentor", True))
+        bio = st.toggle("Bloqueio com Biometria", value=db["config"].get("biometria", False))
+        
+        if (notif != db["config"].get("notificacoes") or 
+            mentor != db["config"].get("dicas_mentor") or 
+            bio != db["config"].get("biometria")):
+            
+            db["config"]["notificacoes"] = notif
+            db["config"]["dicas_mentor"] = mentor
+            db["config"]["biometria"] = bio
+            save_all(db)
+            st.toast("Preferências salvas!")
+
+    # 5. SUPORTE & RESET
+    st.markdown("### 🆘 Suporte")
+    with st.container(border=True):
+        st.markdown("""
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0;">
+            <span>❓ Ajuda e Feedback</span>
+            <span class="material-icons">chevron_right</span>
+        </div>
+        <hr style="margin:5px 0; opacity:0.1">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0;">
+            <span>🛡️ Privacidade</span>
+            <span class="material-icons">chevron_right</span>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    if st.button("Sair da Conta (Limpar Cache)", type="primary"):
+        st.cache_data.clear()
+        st.rerun()
