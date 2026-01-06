@@ -280,6 +280,31 @@ if menu == "Dashboard":
             st.altair_chart(chart, use_container_width=True)
         else: st.info("Registre seu primeiro dia!")
 
+    # --- GRIDS RESTAURADOS (HEATMAPS) ---
+    st.markdown("### 🔥 Mapas de Calor")
+    def draw_grid(title, metric, color):
+        st.caption(title)
+        days = pd.date_range("2026-01-01", "2026-12-31")
+        grid = '<div style="display: flex; flex-wrap: wrap; gap: 4px; max-width: 800px; margin-bottom: 24px;">'
+        for d in days:
+            ds = d.strftime("%Y-%m-%d")
+            reg = db["registros"].get(ds, {})
+            # Cores baseadas no tema
+            c = "#e2e8f0" if "Claro" in tema_selecionado else "#333333"
+            
+            if ds in db["registros"]:
+                if metric == "nota":
+                    n = reg.get("nota", 0)
+                    c = "#22c55e" if n >= 8 else "#eab308" if n >= 5 else "#ef4444"
+                elif metric in LINGUAGENS_LISTA:
+                    c = color if metric in reg.get("ling_eu", []) or metric in reg.get("ling_ela", []) else c
+                else: c = color if reg.get(metric) else c
+            grid += f'<div title="{ds}" style="width: 12px; height: 12px; background-color: {c}; border-radius: 4px;"></div>'
+        st.markdown(grid + '</div>', unsafe_allow_html=True)
+
+    draw_grid("Frequência Sexual", "sexo", "#e91e63")
+    draw_grid("Discussões", "discussao", "#f44336")
+
 # --- 2. REGISTRAR DIA ---
 elif menu == "Registrar Dia":
     with st.container(border=True):
@@ -438,7 +463,7 @@ elif menu == "Insights IA":
                     st.success(resp.choices[0].message.content)
             except Exception as e: st.error(f"Erro: {e}")
 
-# --- 7. CONFIGURAÇÕES (RESTAURADA E MELHORADA) ---
+# --- 7. CONFIGURAÇÕES ---
 elif menu == "Configurações":
     st.markdown("## ⚙️ Configurações & Perfil")
     
@@ -470,7 +495,7 @@ elif menu == "Configurações":
             if st.button(tema, key=f"btn_tema_{tema}", use_container_width=True):
                 db["config"]["tema"] = tema; save_all(db); st.rerun()
     
-    # 3. GERENCIAR OPÇÕES (RESTAURADO COM EDIÇÃO E EXCLUSÃO)
+    # 3. GERENCIAR OPÇÕES
     st.markdown("### 🛠️ Personalização do Diário")
     c1, c2 = st.columns(2)
     
