@@ -131,7 +131,7 @@
             "checks_acordos": {
                 "Não usar telefone no jantar": true
             },
-            "locked": true
+            "locked": false
         }
     },
     "eventos": {
