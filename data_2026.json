@@ -132,6 +132,28 @@
                 "Não usar telefone no jantar": true
             },
             "locked": true
+        },
+        "2026-01-07": {
+            "nota": 4,
+            "gratidao": "",
+            "eu_fiz": [
+                "Elogios",
+                "Ajuda"
+            ],
+            "ela_fez": [],
+            "ling_eu": [
+                "Atos de Serviço",
+                "Tempo de Qualidade"
+            ],
+            "ling_ela": [],
+            "discussao": true,
+            "cat_dr": "Comunicação",
+            "sexo": false,
+            "resumo": "Hoje quando cheguei em casa fui fazer um elogio para Katheryn,  falando do peito dela disse que o bico do peito era rosa e ela ficou chateada,  porque disse que como ela é preta não tem como ter o bico do peito rosa, é marrom, mas eu enxerguei como rosa, só em outro tom, mas mesmo assim ela discutiu. Falou que eu devo estar lembrando de outras mulheres,  enfim. Pesou muito o clima. ",
+            "checks_acordos": {
+                "Não usar telefone no jantar": true
+            },
+            "locked": true
         }
     },
     "eventos": {
@@ -160,7 +182,7 @@
             "Beijos"
         ]
     },
-    "xp": 74,
+    "xp": 96,
     "config": {
         "modelo_ia": "llama-3.3-70b-versatile",
         "tema": "Escuro (Padrão)",
