@@ -4,7 +4,7 @@ import json
 import io
 import base64
 import altair as alt
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from github import Github, Auth
 from groq import Groq
 from fpdf import FPDF
@@ -12,6 +12,17 @@ from PIL import Image
 
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="Love Planner 2026", layout="centered", page_icon="❤️")
+
+# --- AJUSTE DE FUSO HORÁRIO (BRASÍLIA UTC-3) ---
+FUSO_BR = timezone(timedelta(hours=-3))
+
+def get_data_hoje():
+    """Retorna a data atual no fuso de Brasília"""
+    return datetime.now(FUSO_BR).date()
+
+def get_agora():
+    """Retorna o datetime atual no fuso de Brasília"""
+    return datetime.now(FUSO_BR)
 
 # --- SEGURANÇA (SECRETS) ---
 try:
@@ -53,13 +64,8 @@ def load_data():
         if "acordos_mestres" not in data: data["acordos_mestres"] = []
         if "metas" not in data: data["metas"] = {}
         
-        # Defaults de Metas (Expandido)
         metas_default = {
-            "elogios": 3, 
-            "qualidade": 2, 
-            "intimidade": 2, 
-            "gratidao": 4, 
-            "paz": 7 # Dias sem briga
+            "elogios": 3, "qualidade": 2, "intimidade": 2, "gratidao": 4, "paz": 7
         }
         for k, v in metas_default.items():
             if k not in data["metas"]: data["metas"][k] = v
@@ -85,7 +91,7 @@ def save_all(data):
     json_data = json.dumps(data, indent=4, ensure_ascii=False)
     try:
         contents = repo.get_contents("data_2026.json")
-        repo.update_file(contents.path, f"Sync {datetime.now()}", json_data, contents.sha)
+        repo.update_file(contents.path, f"Sync {get_agora()}", json_data, contents.sha)
     except:
         repo.create_file("data_2026.json", "DB Init", json_data)
 
@@ -221,17 +227,10 @@ st.markdown(f"""
         margin-left: auto;
     }}
     
-    /* XP Badge nas Metas */
     .xp-badge {{
-        font-size: 0.7rem; 
-        background-color: #fbbf24; 
-        color: #78350f; 
-        padding: 2px 6px; 
-        border-radius: 6px; 
-        font-weight: 800;
-        margin-left: 8px;
-        vertical-align: middle;
-        display: inline-block;
+        font-size: 0.7rem; background-color: #fbbf24; color: #78350f; 
+        padding: 2px 6px; border-radius: 6px; font-weight: 800;
+        margin-left: 8px; vertical-align: middle; display: inline-block;
     }}
     
     .material-icons {{ font-family: 'Material Symbols Outlined'; font-size: 20px; vertical-align: middle; margin-right: 8px; }}
@@ -244,13 +243,13 @@ CATEGORIAS_DR = ["Comunicação", "Finanças", "Ciúmes", "Família", "Rotina", 
 ICONES_ACORDOS = ["❤️", "🤝", "💰", "🏠", "📅", "🔥", "🙏", "✈️", "🥗", "💪", "🐶", "👶", "🚫", "🍷", "🎮"]
 FREQ_ACORDOS = ["Diário", "Semanal", "Mensal", "Anual", "Único", "Sem Data"]
 
-# --- LÓGICA GAMIFICAÇÃO AVANÇADA ---
+# --- LÓGICA GAMIFICAÇÃO ---
 def calcular_gamificacao(db):
     xp = db["xp"]
     nivel = int((xp / 100) ** 0.5) + 1
     xp_prox = ((nivel) ** 2) * 100
     progresso = min(max((xp - (((nivel - 1) ** 2) * 100)) / (xp_prox - (((nivel - 1) ** 2) * 100)), 0), 1)
-    try: dias = (date.today() - datetime.strptime(db["config"].get("data_inicio", "2026-01-01"), "%Y-%m-%d").date()).days
+    try: dias = (get_data_hoje() - datetime.strptime(db["config"].get("data_inicio", "2026-01-01"), "%Y-%m-%d").date()).days
     except: dias = 0
     return nivel, xp, xp_prox, progresso, dias
 
@@ -398,7 +397,7 @@ if menu == "Dashboard":
 elif menu == "Registrar Dia":
     with st.container(border=True):
         st.markdown("## 📝 Registrar Dia")
-        selected_date = st.date_input("Data:", date.today())
+        selected_date = st.date_input("Data:", get_data_hoje())
         date_str = selected_date.strftime("%Y-%m-%d")
         day_data = db["registros"].get(date_str, {})
         
@@ -463,7 +462,7 @@ elif menu == "Metas & Acordos":
             titulo = st.text_input("Título:")
             desc = st.text_input("Descrição:")
             if st.form_submit_button("Firmar") and titulo:
-                db["acordos_mestres"].append({"titulo": titulo, "icone": icon, "frequencia": freq, "descricao": desc, "data_criacao": str(date.today())})
+                db["acordos_mestres"].append({"titulo": titulo, "icone": icon, "frequencia": freq, "descricao": desc, "data_criacao": str(get_data_hoje())})
                 save_all(db); st.rerun()
 
     st.markdown("### 📜 Acordos Ativos")
@@ -493,28 +492,26 @@ elif menu == "Metas & Acordos":
                 if st.button("🗑️", key=f"del_{i}"): db["acordos_mestres"].pop(i); save_all(db); st.rerun()
 
     st.divider()
-    st.markdown("### 🎯 Metas da Semana ")
+    st.markdown("### 🎯 Metas da Semana (Expandido)")
     
-    # Cálculos das Metas Semanais (Versão 6.9)
-    hoje = date.today()
+    hoje = get_data_hoje()
     inicio_sem = hoje - timedelta(days=hoje.weekday())
     reg_semana = [db["registros"].get((inicio_sem + timedelta(days=i)).strftime("%Y-%m-%d"), {}) for i in range(7)]
     
-    # Contadores
     c_elogios = sum(1 for r in reg_semana if "Elogio" in str(r.get("eu_fiz", [])))
     c_qualidade = sum(1 for r in reg_semana if "Tempo de Qualidade" in str(r.get("eu_fiz", [])))
     c_intimidade = sum(1 for r in reg_semana if r.get("sexo"))
     c_gratidao = sum(1 for r in reg_semana if r.get("gratidao"))
-    c_paz = sum(1 for r in reg_semana if not r.get("discussao")) # Dias SEM discussão
+    c_paz = sum(1 for r in reg_semana if not r.get("discussao"))
     
-    metas = db["metas"] # Metas configuradas
+    metas = db["metas"]
     
-    def render_meta(titulo, icone, atual, alvo, xp_valor, cor="#f42536"):
+    def render_meta(titulo, icone, atual, alvo, xp_valor):
         pct = min(atual / alvo, 1.0) if alvo > 0 else 0
         with st.container(border=True):
             st.markdown(f"""
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
-                <div style="font-weight:700;">{icone} {titulo} <span class="xp-badge">+{xp_valor} XP/cada</span></div>
+                <div style="font-weight:700;">{icone} {titulo} <span class="xp-badge">+{xp_valor} XP</span></div>
                 <div style="font-size:0.8rem; font-weight:600;">{atual}/{alvo}</div>
             </div>
             """, unsafe_allow_html=True)
@@ -523,8 +520,8 @@ elif menu == "Metas & Acordos":
     c_m1, c_m2 = st.columns(2)
     with c_m1:
         render_meta("Elogios", "💌", c_elogios, metas["elogios"], 5)
-        render_meta("Tempo Qualidade", "🕰️", c_qualidade, metas["qualidade"], 10)
-        render_meta("Sem Discussões", "🕊️", c_paz, metas["paz"], 15)
+        render_meta("Qualidade", "🕰️", c_qualidade, metas["qualidade"], 10)
+        render_meta("Sem Brigas", "🕊️", c_paz, metas["paz"], 15)
     with c_m2:
         render_meta("Intimidade", "🔥", c_intimidade, metas["intimidade"], 20)
         render_meta("Gratidão", "🙏", c_gratidao, metas["gratidao"], 5)
@@ -569,7 +566,7 @@ elif menu == "🏆 Conquistas":
 # --- 5. CÁPSULA ---
 elif menu == "⏳ Cápsula":
     st.markdown("## ⏳ Cápsula do Tempo")
-    hoje = date.today()
+    hoje = get_data_hoje()
     datas_alvo = {"Há 30 Dias": (hoje - timedelta(days=30)), "Há 90 Dias": (hoje - timedelta(days=90))}
     for label, data_obj in datas_alvo.items():
         data_str = data_obj.strftime("%Y-%m-%d")
