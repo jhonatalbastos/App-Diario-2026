@@ -163,7 +163,7 @@
     "xp": 74,
     "config": {
         "modelo_ia": "llama-3.3-70b-versatile",
-        "tema": "Claro (Padrão)",
+        "tema": "Escuro (Padrão)",
         "home_page": "Registrar Dia",
         "data_inicio": "2022-04-02",
         "nomes_casal": "Jhonata & Katheryn",
