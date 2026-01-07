@@ -105,6 +105,33 @@
                 "Não usar telefone no jantar": false
             },
             "locked": true
+        },
+        "2026-01-06": {
+            "nota": 9,
+            "gratidao": "Katheryn entender que eu não queria mais ficar falando da minha filha e respeitar isso. ",
+            "eu_fiz": [
+                "Elogios",
+                "Ouvir"
+            ],
+            "ela_fez": [
+                "Beijos"
+            ],
+            "ling_eu": [
+                "Tempo de Qualidade",
+                "Toque Físico",
+                "Palavras de Afirmação"
+            ],
+            "ling_ela": [
+                "Tempo de Qualidade"
+            ],
+            "discussao": false,
+            "cat_dr": null,
+            "sexo": true,
+            "resumo": "Conversamos de forma descontraída na sala por um bom tempo. Katheryn mais uma vez quis falar dos problemas com minha filha e pedi para parar de falar disso todo dia, porque fica muito maçante. ",
+            "checks_acordos": {
+                "Não usar telefone no jantar": true
+            },
+            "locked": true
         }
     },
     "eventos": {
@@ -133,7 +160,7 @@
             "Beijos"
         ]
     },
-    "xp": 40,
+    "xp": 67,
     "config": {
         "modelo_ia": "llama-3.3-70b-versatile",
         "tema": "Claro (Padrão)",
@@ -147,6 +174,9 @@
     },
     "metas": {
         "elogios": 3,
-        "qualidade": 2
+        "qualidade": 2,
+        "intimidade": 2,
+        "gratidao": 4,
+        "paz": 7
     }
 }
