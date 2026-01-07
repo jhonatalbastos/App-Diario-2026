@@ -131,7 +131,7 @@
             "checks_acordos": {
                 "Não usar telefone no jantar": true
             },
-            "locked": false
+            "locked": true
         }
     },
     "eventos": {
@@ -160,7 +160,7 @@
             "Beijos"
         ]
     },
-    "xp": 67,
+    "xp": 74,
     "config": {
         "modelo_ia": "llama-3.3-70b-versatile",
         "tema": "Claro (Padrão)",
