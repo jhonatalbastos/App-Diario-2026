@@ -154,6 +154,30 @@
                 "Não usar telefone no jantar": true
             },
             "locked": true
+        },
+        "2026-01-08": {
+            "nota": 5,
+            "gratidao": "Sou grato por ter saúde ",
+            "eu_fiz": [
+                "Ajuda"
+            ],
+            "ela_fez": [
+                "Cuidado"
+            ],
+            "ling_eu": [
+                "Atos de Serviço"
+            ],
+            "ling_ela": [
+                "Atos de Serviço"
+            ],
+            "discussao": false,
+            "cat_dr": null,
+            "sexo": false,
+            "resumo": "Hoje Katheryn veio me dizer que ela pode ficar com partes intimas com cor muito escura depois de ser mãe,  e me perguntou o que acho disso. Eu disse que pra mim tanto faz, serão bonitos em cada época da cor que forem , depois ela parou de questionar. Ajudei a colocar o armário no lugar que ela queria,  ela fez uma coxa assada muito gostosa ",
+            "checks_acordos": {
+                "Não usar telefone no jantar": true
+            },
+            "locked": true
         }
     },
     "eventos": {
@@ -182,7 +206,7 @@
             "Beijos"
         ]
     },
-    "xp": 96,
+    "xp": 123,
     "config": {
         "modelo_ia": "llama-3.3-70b-versatile",
         "tema": "Escuro (Padrão)",
