@@ -226,7 +226,7 @@
             "checks_acordos": {
                 "Não usar telefone no jantar": false
             },
-            "locked": true
+            "locked": false
         }
     },
     "eventos": {
