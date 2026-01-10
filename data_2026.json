@@ -203,6 +203,30 @@
                 "Não usar telefone no jantar": true
             },
             "locked": true
+        },
+        "2026-01-10": {
+            "nota": 7,
+            "gratidao": "",
+            "eu_fiz": [
+                "Ouvir"
+            ],
+            "ela_fez": [
+                "Apoio"
+            ],
+            "ling_eu": [
+                "Tempo de Qualidade"
+            ],
+            "ling_ela": [
+                "Tempo de Qualidade"
+            ],
+            "discussao": true,
+            "cat_dr": "Comunicação",
+            "sexo": false,
+            "resumo": "Hoje pela manhã já tivemos uma discussão sobre Sara. Respondi a mensagem de Sara dizendo que hoje vou pegar ela as 10h e levando para casa das 18h. Katheryn queria que eu mandasse a mensagem de uma forma e eu de outra, no final das contas mandei a mensagem da forma que eu queria, Só informando o horário. As outras mensagens que eu preciso falar, vou falar pessoalmente. Depois pedi para não falarmos mais disso, só que alguns momentos depois o tio da Sara mandou áudio. Ela queria que eu falasse repostas indo para baixaria para deixar ele envergonhado ou ignorar, o que eu acho que é a melhor opção também e resolvi ignorar mesmo. ",
+            "checks_acordos": {
+                "Não usar telefone no jantar": false
+            },
+            "locked": true
         }
     },
     "eventos": {
@@ -231,7 +255,7 @@
             "Beijos"
         ]
     },
-    "xp": 150,
+    "xp": 170,
     "config": {
         "modelo_ia": "llama-3.3-70b-versatile",
         "tema": "Claro (Padrão)",
