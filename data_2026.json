@@ -178,6 +178,31 @@
                 "Não usar telefone no jantar": true
             },
             "locked": true
+        },
+        "2026-01-09": {
+            "nota": 5,
+            "gratidao": "Katheryn ter acolhido meu pedido. ",
+            "eu_fiz": [
+                "Apoio"
+            ],
+            "ela_fez": [
+                "Cuidado",
+                "Beijos"
+            ],
+            "ling_eu": [
+                "Tempo de Qualidade"
+            ],
+            "ling_ela": [
+                "Tempo de Qualidade"
+            ],
+            "discussao": false,
+            "cat_dr": null,
+            "sexo": true,
+            "resumo": "Ontem pedimos uma bebida, jogamos damas e jantamos. Katheryn começou a falar de Sara de novo e eu disse que queria colocar em casa uma placa de dias sem falar de Sara / Vanessa, da mesma forma que tem placa de dias sem acidente em uma obra. Ela entendeu e parou. Depois disso mais a noite fizemos sexo, e fomos dormir. ",
+            "checks_acordos": {
+                "Não usar telefone no jantar": true
+            },
+            "locked": true
         }
     },
     "eventos": {
@@ -206,7 +231,7 @@
             "Beijos"
         ]
     },
-    "xp": 123,
+    "xp": 150,
     "config": {
         "modelo_ia": "llama-3.3-70b-versatile",
         "tema": "Claro (Padrão)",
